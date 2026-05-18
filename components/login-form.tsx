@@ -16,11 +16,12 @@ export default function LoginForm() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password }),
       });
 
       if (res.ok) {
-        window.location.href = '/dashboard';
+        window.location.replace('/dashboard');
       } else {
         setError('Invalid username or password');
       }
