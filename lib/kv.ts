@@ -6,8 +6,7 @@ export async function kvGet<T>(key: string): Promise<T | null> {
 }
 
 export async function kvSet(key: string, value: unknown, exSeconds = 86400): Promise<void> {
-  const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-  await kv.set(key, serialized, { ex: exSeconds });
+  await kv.set(key, value, { ex: exSeconds });
 }
 
 export async function kvDel(key: string): Promise<void> {

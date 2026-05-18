@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockKvGet, mockKvSet } = vi.hoisted(() => ({
+const { mockKvGet, mockKvSet, mockKvDel } = vi.hoisted(() => ({
   mockKvGet: vi.fn(),
   mockKvSet: vi.fn(),
+  mockKvDel: vi.fn(),
 }));
 
 vi.mock('@vercel/kv', () => ({
   kv: {
     get: mockKvGet,
     set: mockKvSet,
-    del: vi.fn(),
+    del: mockKvDel,
   }
 }));
 
@@ -32,6 +33,11 @@ describe('kv helpers', () => {
 
   it('set stores value with expiry', async () => {
     await kvSet('test_key', { foo: 'bar' });
-    expect(mockKvSet).toHaveBeenCalledWith('test_key', '{"foo":"bar"}', { ex: 86400 });
+    expect(mockKvSet).toHaveBeenCalledWith('test_key', { foo: 'bar' }, { ex: 86400 });
+  });
+
+  it('del removes a key', async () => {
+    await kvDel('test_key');
+    expect(mockKvDel).toHaveBeenCalledWith('test_key');
   });
 });
