@@ -1,0 +1,15 @@
+name: Auto Checker Cron
+
+on:
+  schedule:
+    - cron: '* * * * *'  # Every 1 minute
+  workflow_dispatch:        # Manual trigger in GitHub UI
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Vercel cron endpoint
+        run: |
+          curl -X GET "${{ secrets.VERCEL_CRON_URL }}/api/cron/check" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
