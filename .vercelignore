@@ -1,0 +1,17 @@
+node_modules/
+.venv/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+tests/
+__tests__/
+coverage/
+.env
+.env.local
+.env.*.local
+*.md
+docs/
+.github/
+.vitest/
+vitest.config.ts
