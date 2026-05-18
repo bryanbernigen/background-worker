@@ -11,7 +11,15 @@
       "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/settings -D /tmp/s.txt -w 'HTTP: %{http_code}' -o /dev/null)",
       "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt -X POST http://localhost:3000/api/auth/logout -D /tmp/l.txt -o /dev/null)",
       "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/api/status)",
-      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/settings -w \"\\\\nHTTP: %{http_code}\")"
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/settings -w \"\\\\nHTTP: %{http_code}\")",
+      "Bash(curl -s -c /tmp/r1.txt -b /tmp/r1.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -D /tmp/rh1.txt -o /dev/null)",
+      "Bash(curl -s -c /tmp/r1.txt -b /tmp/r1.txt https://auto-checker-app-production.up.railway.app/dashboard -D /tmp/rh2.txt -w '\\\\nHTTP: %{http_code}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/r3.txt -b /tmp/r3.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -D /tmp/rh5.txt -o /dev/null)",
+      "Bash(curl -s -c /tmp/r4.txt -b /tmp/r4.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -D /tmp/rh6.txt -o /dev/null)",
+      "Bash(curl -s -c /tmp/r4.txt -b /tmp/r4.txt https://auto-checker-app-production.up.railway.app/dashboard -D /tmp/rh7.txt -w 'HTTP: %{http_code}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/r5.txt -b /tmp/r5.txt -L -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -w '\\\\nFinal HTTP: %{http_code}' -o /tmp/r5_body.html)",
+      "Bash(curl -s -c /tmp/r5.txt -b /tmp/r5.txt https://auto-checker-app-production.up.railway.app/settings -w 'HTTP: %{http_code}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/r5.txt -b /tmp/r5.txt https://auto-checker-app-production.up.railway.app/api/status)"
     ]
   },
   "enabledPlugins": {

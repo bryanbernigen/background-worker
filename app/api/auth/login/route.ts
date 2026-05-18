@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
 
   const token = await createSessionToken(username);
 
-  const res = NextResponse.redirect(new URL('/dashboard', req.url));
+  const baseUrl = process.env.RAILWAY_APP_URL || req.headers.get('origin') || 'https://auto-checker-app-production.up.railway.app';
+  const res = NextResponse.redirect(new URL('/dashboard', baseUrl));
   res.cookies.set('session', token, {
     httpOnly: true,
     secure: true,
