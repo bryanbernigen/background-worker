@@ -25,7 +25,7 @@ export class WahaClient {
       });
 
       const data = await res.json();
-      return data.success === true;
+      return res.ok && !!data;
     } catch (err) {
       console.error('[WAHA] Error:', err);
       return false;

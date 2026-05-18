@@ -19,7 +19,23 @@
       "Bash(curl -s -c /tmp/r4.txt -b /tmp/r4.txt https://auto-checker-app-production.up.railway.app/dashboard -D /tmp/rh7.txt -w 'HTTP: %{http_code}' -o /dev/null)",
       "Bash(curl -s -c /tmp/r5.txt -b /tmp/r5.txt -L -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -w '\\\\nFinal HTTP: %{http_code}' -o /tmp/r5_body.html)",
       "Bash(curl -s -c /tmp/r5.txt -b /tmp/r5.txt https://auto-checker-app-production.up.railway.app/settings -w 'HTTP: %{http_code}' -o /dev/null)",
-      "Bash(curl -s -c /tmp/r5.txt -b /tmp/r5.txt https://auto-checker-app-production.up.railway.app/api/status)"
+      "Bash(curl -s -c /tmp/r5.txt -b /tmp/r5.txt https://auto-checker-app-production.up.railway.app/api/status)",
+      "Bash(curl -s -c /tmp/w1.txt -b /tmp/w1.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w1.txt -b /tmp/w1.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/wa-recipient -H 'Content-Type: application/json' -d '{\"waRecipient\":\"6289540685550\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w1.txt -b /tmp/w1.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/test-whatsapp -w '\\\\nHTTP: %{http_code}')",
+      "Bash(curl -s -c /tmp/w2.txt -b /tmp/w2.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w2.txt -b /tmp/w2.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/wa-recipient -H 'Content-Type: application/json' -d '{\"waRecipient\":\"6289540685550\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w2.txt -b /tmp/w2.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/test-whatsapp -w \"\\\\nHTTP: %{http_code}\")",
+      "Bash(curl -s -c /tmp/w3.txt -b /tmp/w3.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w3.txt -b /tmp/w3.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/wa-recipient -H 'Content-Type: application/json' -d '{\"waRecipient\":\"6289540685550\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w3.txt -b /tmp/w3.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/test-whatsapp -w \"\\\\nHTTP: %{http_code}\")",
+      "Bash(curl -s -c /tmp/w4.txt -b /tmp/w4.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w4.txt -b /tmp/w4.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/wa-recipient -H 'Content-Type: application/json' -d '{\"waRecipient\":\"62895406855500\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w4.txt -b /tmp/w4.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/test-whatsapp -w \"\\\\nHTTP: %{http_code}\")",
+      "Bash(curl -s -c /tmp/w5.txt -b /tmp/w5.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w5.txt -b /tmp/w5.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/wa-recipient -H 'Content-Type: application/json' -d '{\"waRecipient\":\"62895406855500\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/w5.txt -b /tmp/w5.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/test-whatsapp)",
+      "Bash(railway logs *)"
     ]
   },
   "enabledPlugins": {
