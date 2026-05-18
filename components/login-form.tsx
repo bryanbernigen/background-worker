@@ -1,13 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function LoginForm() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,8 +20,7 @@ export default function LoginForm() {
       });
 
       if (res.ok) {
-        router.push('/dashboard');
-        router.refresh();
+        window.location.href = '/dashboard';
       } else {
         setError('Invalid username or password');
       }
@@ -35,7 +32,7 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-8">
+    <div className="w-full max-w-sm bg-white rounded-lg shadow-md p-8 text-black">
       <h1 className="text-2xl font-bold text-center mb-6">Auto Checker</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -44,7 +41,7 @@ export default function LoginForm() {
             type="text"
             value={username}
             onChange={e => setUsername(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-black"
             required
           />
         </div>
@@ -54,7 +51,7 @@ export default function LoginForm() {
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md text-black"
             required
           />
         </div>
