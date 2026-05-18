@@ -26,7 +26,7 @@ npm run dev
 | `WAHA_API_KEY` | WAHA API key (optional) | No |
 | `JWT_SECRET` | Secret for signing session JWT (min 32 chars) | Yes |
 | `CRON_SECRET` | Secret token for GitHub Actions cron calls | Yes |
-| `ADMIN_PASSWORD` | Login password (default: P@assword123) | No |
+| `ADMIN_PASSWORD` | Login password (set via Railway env vars) | No |
 
 ## Deployment (Railway)
 
@@ -46,7 +46,8 @@ Everything deploys to Railway as Docker containers.
 4. Add environment variables:
    - `UPSTASH_REDIS_REST_URL`
    - `UPSTASH_REDIS_REST_TOKEN`
-   - `WAHA_URL` (e.g. `http://auto-checker-waha:3000`)
+   - `WAHA_URL` (use public URL: `https://auto-checker-waha-production.up.railway.app`)
+   - `WAHA_API_KEY` (from WAHA dashboard)
    - `JWT_SECRET` — generate with `openssl rand -base64 32`
    - `CRON_SECRET` — any random string
 5. Deploy
@@ -54,9 +55,9 @@ Everything deploys to Railway as Docker containers.
 ### 3. WAHA on Railway
 
 1. In the same Railway project, add a new service with Docker image: `devlikeapro/waha:latest`
-2. Add environment variable: `WAHA_SESSION=default`
-3. Note the internal URL (e.g. `http://auto-checker-waha:3000`)
-4. Update `auto-checker-app` `WAHA_URL` to the internal URL
+2. Add environment variables: `WAHA_SESSION=default`, `WAHA_DASHBOARD_USERNAME=admin`, `WAHA_DASHBOARD_PASSWORD=<your-password>`, `WAHA_API_KEY=<your-key>`
+3. Note the public URL from Railway (e.g. `https://auto-checker-waha-production.up.railway.app`)
+4. Update `auto-checker-app` `WAHA_URL` to the public WAHA URL
 
 After WAHA deploys, open the WAHA dashboard URL, configure your WhatsApp session, and generate an API key if needed.
 

@@ -1,0 +1,8 @@
+#!/bin/sh
+# Prevent committing secrets - skip the hook file itself
+FOUND=$(git diff --cached 2>/dev/null | grep -E "AIza[0-9A-Za-z_-]{20,}|sk-[a-z0-9-]{20,}|a8acd87c55c44a839657bb0b255eef5b|complete-chigger|gQAAAAAAAfaP" | grep -v ".githooks/pre-commit" || true)
+if [ -n "$FOUND" ]; then
+  echo "ERROR: Potential secrets detected:"
+  echo "$FOUND"
+  exit 1
+fi

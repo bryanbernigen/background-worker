@@ -35,7 +35,10 @@
       "Bash(curl -s -c /tmp/w5.txt -b /tmp/w5.txt -X POST https://auto-checker-app-production.up.railway.app/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -o /dev/null)",
       "Bash(curl -s -c /tmp/w5.txt -b /tmp/w5.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/wa-recipient -H 'Content-Type: application/json' -d '{\"waRecipient\":\"62895406855500\"}' -o /dev/null)",
       "Bash(curl -s -c /tmp/w5.txt -b /tmp/w5.txt -X POST https://auto-checker-app-production.up.railway.app/api/settings/test-whatsapp)",
-      "Bash(railway logs *)"
+      "Bash(railway logs *)",
+      "Bash(mkdir -p .git/hooks)",
+      "Bash(cat)",
+      "Bash(chmod +x .git/hooks/pre-commit)"
     ]
   },
   "enabledPlugins": {
