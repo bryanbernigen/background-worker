@@ -6,7 +6,7 @@ import DashboardCards from '@/components/dashboard-cards';
 export default async function DashboardPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get('session')?.value;
-  const session = token ? verifySessionToken(token) : null;
+  const session = token ? await verifySessionToken(token) : null;
 
   if (!session) {
     redirect('/');

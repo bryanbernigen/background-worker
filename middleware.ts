@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifySessionToken } from '@/lib/auth';
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Public paths
@@ -21,7 +21,7 @@ export function middleware(req: NextRequest) {
 
   // All other paths require session
   const token = req.cookies.get('session')?.value;
-  const session = token ? verifySessionToken(token) : null;
+  const session = token ? await verifySessionToken(token) : null;
 
   if (!session) {
     return NextResponse.redirect(new URL('/', req.url));
