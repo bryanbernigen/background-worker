@@ -1062,19 +1062,19 @@ export function parseDataAnnotation(html: string): DataAnnotationProps | null {
 export function extractPaidItems(props: DataAnnotationProps): PaidItem[] {
   const items: PaidItem[] = [];
 
-  // reportableProjectsInfo
+  // reportableProjectsInfo — only those with pay
   if (props.reportableProjectsInfo) {
     items.push(...props.reportableProjectsInfo.filter(i => i.pay && i.pay.includes('$')));
   }
 
-  // dashboardMerchTargeting.projects
+  // dashboardMerchTargeting.projects — only those with pay
   if (props.dashboardMerchTargeting?.projects) {
     items.push(...props.dashboardMerchTargeting.projects.filter(i => i.pay && i.pay.includes('$')));
   }
 
-  // dashboardMerchTargeting.qualifications
+  // dashboardMerchTargeting.qualifications — ALL qualifications regardless of pay
   if (props.dashboardMerchTargeting?.qualifications) {
-    items.push(...props.dashboardMerchTargeting.qualifications.filter(i => i.pay && i.pay.includes('$')));
+    items.push(...props.dashboardMerchTargeting.qualifications);
   }
 
   return items;
@@ -1265,6 +1265,7 @@ const sampleProps = {
   dashboardMerchTargeting: {
     qualifications: [
       { id: '2', name: 'Qual B', pay: '$25.00/hr', availableTasksFor: '1', created: '2026-05-02', qualification: true },
+      { id: '4', name: 'Qual Free', pay: '', availableTasksFor: '1', created: '2026-05-04', qualification: true },
     ],
     projects: [
       { id: '3', name: 'Project C', pay: '$60.00/hr', availableTasksFor: '10', created: '2026-05-03', qualification: false },
@@ -1301,20 +1302,27 @@ describe('parseDataAnnotation', () => {
 });
 
 describe('extractPaidItems', () => {
-  it('extracts items with pay containing $', () => {
+  it('extracts projects with pay and ALL qualifications', () => {
     const items = extractPaidItems(sampleProps);
-    expect(items).toHaveLength(3);
-    expect(items.map(i => i.id)).toEqual(['1', '2', '3']);
+    // Projects with pay: '1', '3' (2). Qualifications: '2', '4' (2, regardless of pay).
+    expect(items).toHaveLength(4);
+    expect(items.map(i => i.id)).toEqual(['1', '3', '2', '4']);
   });
 
-  it('filters out items without pay', () => {
+  it('filters out unpaid projects but includes unpaid qualifications', () => {
     const props = {
-      reportableProjectsInfo: [
-        { id: '1', name: 'Free', pay: '', availableTasksFor: '0', created: '2026-05-01', qualification: false },
-      ],
+      dashboardMerchTargeting: {
+        qualifications: [
+          { id: 'qual1', name: 'Free Qual', pay: '', availableTasksFor: '1', created: '2026-05-01', qualification: true },
+        ],
+        projects: [
+          { id: 'proj1', name: 'Free Project', pay: '', availableTasksFor: '0', created: '2026-05-01', qualification: false },
+        ],
+      },
     };
     const items = extractPaidItems(props);
-    expect(items).toHaveLength(0);
+    expect(items).toHaveLength(1);
+    expect(items[0].id).toBe('qual1');
   });
 });
 

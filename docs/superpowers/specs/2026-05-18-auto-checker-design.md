@@ -74,7 +74,7 @@ This produces truly random hit times (e.g. 7:01:23 → 7:08:42) rather than fixe
 
 ### Last Seen State (for deduplication)
 - Vercel KV key `da_last_seen` stores a JSON object: `{ projects: [...projectIds], qualifications: [...qualIds], updatedAt: "..." }`
-- After each scrape, the new list is compared against last seen. Only new items with pay info trigger WhatsApp
+- After each scrape, the new list is compared against last seen. **Projects** with pay info (containing `$`) trigger WhatsApp. **Qualifications** trigger WhatsApp regardless of payment.
 
 ## 4. DataAnnotation Checker Module
 
@@ -82,9 +82,9 @@ This produces truly random hit times (e.g. 7:01:23 → 7:08:42) rather than fixe
 1. Fetch `https://app.dataannotation.tech/workers/projects` with the stored cookie
 2. Parse the response HTML — extract the `data-props` JSON from `<div id="workers/WorkerProjectsTable-hybrid-root" ...>`
 3. Parse the JSON — extract `projects[]` and `qualifications[]` arrays
-4. Filter items where `pay` is non-empty (contains `$`)
+4. Filter: **Projects** only if `pay` is non-empty (contains `$`); **Qualifications** all of them regardless of pay
 5. Compare against `da_last_seen`:
-   - Any project ID or qualification ID not in last seen → new → queue WhatsApp
+   - Any project or qualification ID not in last seen → new → queue WhatsApp
    - Any ID in last seen but not in current response → removed (no notification, just update state)
 6. Update `da_last_seen` in KV with the new combined list
 
