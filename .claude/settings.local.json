@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"EXIT:$?\")",
+      "Skill(railway:use-railway)",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -D /tmp/h1.txt -o /dev/null)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/dashboard -D /tmp/d1.txt -w 'HTTP: %{http_code}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"P@ssword123\"}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/api/status -w \"\\\\nHTTP: %{http_code}\")",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/settings -D /tmp/s.txt -w 'HTTP: %{http_code}' -o /dev/null)",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt -X POST http://localhost:3000/api/auth/logout -D /tmp/l.txt -o /dev/null)",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/api/status)",
+      "Bash(curl -s -c /tmp/c1.txt -b /tmp/c1.txt http://localhost:3000/settings -w \"\\\\nHTTP: %{http_code}\")"
+    ]
+  },
+  "enabledPlugins": {
+    "railway@claude-plugins-official": true
+  }
+}

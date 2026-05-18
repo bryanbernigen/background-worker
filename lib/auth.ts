@@ -5,7 +5,7 @@ export interface SessionPayload {
 
 const encoder = new TextEncoder();
 
-async function createHmac(data: string, secret: string): Promise<string> {
+async function hmac(data: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     'raw',
     encoder.encode(secret),
@@ -14,30 +14,38 @@ async function createHmac(data: string, secret: string): Promise<string> {
     ['sign'],
   );
   const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
-  return btoa(String.fromCharCode(...new Uint8Array(sig)));
+  const raw = btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return raw.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-async function verifyHmac(data: string, sig: string, secret: string): Promise<boolean> {
-  const expected = await createHmac(data, secret);
-  return expected === sig;
+function toBase64url(str: string): string {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function fromBase64url(str: string): string {
+  const padded = str.replace(/-/g, '+').replace(/_/g, '/');
+  return atob(padded);
 }
 
 export async function createSessionToken(username: string): Promise<string> {
-  const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
+  const secret = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
   const exp = Date.now() + 7 * 24 * 60 * 60 * 1000;
   const payload = JSON.stringify({ username, exp });
-  const sig = await createHmac(payload, JWT_SECRET);
-  return btoa(payload) + '.' + sig;
+  const payloadB64 = toBase64url(payload);
+  const sig = await hmac(payloadB64, secret);
+  return `${payloadB64}.${sig}`;
 }
 
 export async function verifySessionToken(token: string): Promise<SessionPayload | null> {
   try {
-    const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
+    const secret = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
     const [payloadB64, sig] = token.split('.');
     if (!payloadB64 || !sig) return null;
-    const valid = await verifyHmac(payloadB64, sig, JWT_SECRET);
-    if (!valid) return null;
-    const { username, exp } = JSON.parse(atob(payloadB64));
+
+    const expectedSig = await hmac(payloadB64, secret);
+    if (sig !== expectedSig) return null;
+
+    const { username, exp } = JSON.parse(fromBase64url(payloadB64));
     if (Date.now() > exp) return null;
     return { username, exp };
   } catch {

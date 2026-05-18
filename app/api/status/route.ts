@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server';
 import { kvGet } from '@/lib/kv';
 
+async function safeGet<T>(key: string): Promise<T | null> {
+  try {
+    return await kvGet<T>(key);
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
-  const lastChecked = await kvGet<string>('last_checked');
-  const nextAllowed = await kvGet<string>('next_allowed_run');
-  const cookie = await kvGet<string>('da_cookie');
-  const activity = await kvGet<Array<{ timestamp: string; type: string; message: string }>>('activity_log');
+  const [lastChecked, nextAllowed, cookie, activity] = await Promise.all([
+    safeGet<string>('last_checked'),
+    safeGet<string>('next_allowed_run'),
+    safeGet<string>('da_cookie'),
+    safeGet<Array<{ timestamp: string; type: string; message: string }>>('activity_log'),
+  ]);
 
   let status: 'running' | 'sleeping' | 'auth_error' | 'no_cookie' = 'sleeping';
   if (!cookie) status = 'no_cookie';
