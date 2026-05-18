@@ -20,69 +20,58 @@ npm run dev
 
 | Variable | Description | Required |
 |---|---|---|
-| `KV_REST_API_URL` | Vercel KV REST API URL | Yes |
-| `KV_REST_API_TOKEN` | Vercel KV REST API token | Yes |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL | Yes |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token | Yes |
 | `WAHA_URL` | WAHA API base URL (e.g. http://localhost:3001) | Yes |
 | `WAHA_API_KEY` | WAHA API key (optional) | No |
 | `JWT_SECRET` | Secret for signing session JWT (min 32 chars) | Yes |
 | `CRON_SECRET` | Secret token for GitHub Actions cron calls | Yes |
 | `ADMIN_PASSWORD` | Login password (default: P@assword123) | No |
 
-## Deployment
+## Deployment (Railway)
 
-### 1. Vercel
+Everything deploys to Railway as Docker containers.
 
-1. Push to GitHub
-2. Import project in Vercel dashboard
-3. Add environment variables in Vercel project settings:
-   - `KV_REST_API_URL`
-   - `KV_REST_API_TOKEN`
-   - `WAHA_URL`
-   - `WAHA_API_KEY` (if using)
-   - `JWT_SECRET`
-   - `CRON_SECRET`
-4. Deploy
+### 1. Upstash Redis
 
-### 2. Vercel KV Setup
+1. Create free account at [upstash.com](https://upstash.com)
+2. Create a new Redis database
+3. Go to REST API tab → copy `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
 
-1. Go to Storage in Vercel dashboard
-2. Create a new KV database (Vercel KV)
-3. Copy the REST API URL and token
-4. Add to Vercel environment variables
+### 2. Deploy to Railway
 
-### 3. GitHub Actions (for random scheduling)
+1. Push to GitHub (code is already on GitHub)
+2. Go to [railway.app](https://railway.app) → auto-checker project
+3. In the `auto-checker-app` service, configure source to use GitHub repo `bryanbernigen/auto-checker`, branch `main`
+4. Add environment variables:
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+   - `WAHA_URL` (e.g. `http://auto-checker-waha:3000`)
+   - `JWT_SECRET` — generate with `openssl rand -base64 32`
+   - `CRON_SECRET` — any random string
+5. Deploy
+
+### 3. WAHA on Railway
+
+1. In the same Railway project, add a new service with Docker image: `devlikeapro/waha:latest`
+2. Add environment variable: `WAHA_SESSION=default`
+3. Note the internal URL (e.g. `http://auto-checker-waha:3000`)
+4. Update `auto-checker-app` `WAHA_URL` to the internal URL
+
+After WAHA deploys, open the WAHA dashboard URL, configure your WhatsApp session, and generate an API key if needed.
+
+### 4. GitHub Actions (for random scheduling)
 
 1. In your GitHub repo, go to Settings > Secrets and variables > Actions
-2. Add these secrets:
-   - `VERCEL_CRON_URL` — your Vercel app URL (e.g. https://auto-checker.vercel.app)
-   - `CRON_SECRET` — must match the CRON_SECRET env var in Vercel
-3. The workflow `.github/workflows/check.yml` runs every 1 minute and calls your Vercel API
-
-### 4. WAHA Deployment
-
-WAHA must be publicly accessible for the Vercel app to send WhatsApp messages.
-
-**Option A — Railway (recommended, free tier):**
-1. Create account at railway.xyz
-2. New Project → Deploy from Docker image → `devlikeapro/waha:latest`
-3. Add environment variable: `WAHA_SESSION=default`
-4. Note the deployment URL (e.g. `https://auto-checker-waha.up.railway.app`)
-5. Set `WAHA_URL=https://auto-checker-waha.up.railway.app` in Vercel env vars
-
-**Option B — Render:**
-1. Create account at render.com
-2. New → Web Service → image `devlikeapro/waha:latest`
-3. Set environment variable `WAHA_SESSION=default`
-4. Note the URL and set as `WAHA_URL`
-
-After deployment, open WAHA dashboard at its URL, configure your WhatsApp session (Settings → Sessions), and generate an API key if needed.
+2. Add `CRON_SECRET` matching the value in Railway
+3. The workflow `.github/workflows/check.yml` runs every 1 minute and calls your Railway app URL
 
 ## Architecture
 
 - **Next.js 15** (App Router, TypeScript) — UI and API routes
-- **Vercel KV** — cookie storage, last-seen state, activity log
-- **GitHub Actions** — fires every 1 minute, Vercel API handles scheduling logic
-- **WAHA** — sends WhatsApp messages
+- **Upstash Redis** — cookie storage, last-seen state, activity log
+- **GitHub Actions** — fires every 1 minute, Railway app handles scheduling logic
+- **WAHA** (Docker) — sends WhatsApp messages
 
 ## Adding New Checkers
 
