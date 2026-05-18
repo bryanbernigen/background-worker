@@ -9,7 +9,7 @@ jobs:
   trigger:
     runs-on: ubuntu-latest
     steps:
-      - name: Call Vercel cron endpoint
+      - name: Call Railway cron endpoint
         run: |
-          curl -X GET "${{ secrets.VERCEL_CRON_URL }}/api/cron/check" \
+          curl -X GET "${{ secrets.RAILWAY_APP_URL }}/api/cron/check" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
