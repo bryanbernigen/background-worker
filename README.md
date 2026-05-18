@@ -5,11 +5,16 @@ Monitors DataAnnotation projects API on a random 5-30 minute schedule and sends 
 ## Quick Start (Local Development)
 
 ```bash
+# Start WAHA (WhatsApp bridge)
+docker compose up -d waha
+
 npm install
 cp .env.local.example .env.local
 # Fill in .env.local with your values
 npm run dev
 ```
+
+**WAHA runs on port 3001.** Open http://localhost:3001 to configure your WhatsApp session.
 
 ## Environment Variables
 
@@ -53,13 +58,24 @@ npm run dev
    - `CRON_SECRET` — must match the CRON_SECRET env var in Vercel
 3. The workflow `.github/workflows/check.yml` runs every 1 minute and calls your Vercel API
 
-### 4. WAHA Setup
+### 4. WAHA Deployment
 
-WAHA must be running and accessible. Options:
-- **Local** (for development): Run WAHA locally on port 3001
-- **Production**: Deploy WAHA on Railway, Render, or similar
+WAHA must be publicly accessible for the Vercel app to send WhatsApp messages.
 
-Set `WAHA_URL` to the accessible URL of your WAHA instance.
+**Option A — Railway (recommended, free tier):**
+1. Create account at railway.xyz
+2. New Project → Deploy from Docker image → `devlikeapro/waha:latest`
+3. Add environment variable: `WAHA_SESSION=default`
+4. Note the deployment URL (e.g. `https://auto-checker-waha.up.railway.app`)
+5. Set `WAHA_URL=https://auto-checker-waha.up.railway.app` in Vercel env vars
+
+**Option B — Render:**
+1. Create account at render.com
+2. New → Web Service → image `devlikeapro/waha:latest`
+3. Set environment variable `WAHA_SESSION=default`
+4. Note the URL and set as `WAHA_URL`
+
+After deployment, open WAHA dashboard at its URL, configure your WhatsApp session (Settings → Sessions), and generate an API key if needed.
 
 ## Architecture
 
