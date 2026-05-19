@@ -2,7 +2,7 @@ name: Auto Checker Cron
 
 on:
   schedule:
-    - cron: '* * * * *'  # Every 1 minute
+    - cron: '*/5 * * * *'  # Every 5 minutes
   workflow_dispatch:        # Manual trigger in GitHub UI
 
 jobs:
