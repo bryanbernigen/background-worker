@@ -3,12 +3,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkers } from '@/lib/checkers';
 import { kvGet, kvSet } from '@/lib/kv';
 
-// UTC+7 time check (7AM to 11PM)
 function isWithinTimeWindow(): boolean {
+  const tzOffset = parseInt(process.env.TIMEZONE_OFFSET ?? '7', 10);
+  const startHour = parseInt(process.env.DAY_START_HOUR ?? '7', 10);
+  const endHour = parseInt(process.env.DAY_END_HOUR ?? '23', 10);
+
   const now = new Date();
-  const utc7 = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-  const hour = utc7.getUTCHours();
-  return hour >= 7 && hour < 23;
+  const local = new Date(now.getTime() + tzOffset * 60 * 60 * 1000);
+  const hour = local.getUTCHours();
+
+  return hour >= startHour && hour <= endHour;
 }
 
 function randomBetween(min: number, max: number): number {
@@ -21,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   // Time window check (skip for manual triggers)
   if (!isManual && !isWithinTimeWindow()) {
-    return NextResponse.json({ message: 'Outside time window (7AM–11PM UTC+7)' });
+    return NextResponse.json({ message: 'Outside time window' });
   }
 
   // Check next_allowed_run (skip for manual triggers)
@@ -44,8 +48,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Generate new random interval for next run
-    const nextMinutes = randomBetween(5, 30);
+    // Generate new random interval for next run (10-30 minutes)
+    const nextMinutes = randomBetween(10, 30);
     const nextRun = new Date(Date.now() + nextMinutes * 60 * 1000);
     await kvSet('next_allowed_run', nextRun.toISOString());
     await kvSet('last_checked', new Date().toISOString());

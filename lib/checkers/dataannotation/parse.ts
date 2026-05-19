@@ -33,19 +33,30 @@ export function parseDataAnnotation(html: string): DataAnnotationProps | null {
 export function extractPaidItems(props: DataAnnotationProps): PaidItem[] {
   const items: PaidItem[] = [];
 
-  // reportableProjectsInfo — only those with pay
+  // reportableProjectsInfo — only those with pay AND tasks
   if (props.reportableProjectsInfo) {
-    items.push(...props.reportableProjectsInfo.filter(i => i.pay && i.pay.includes('$')));
+    items.push(...props.reportableProjectsInfo.filter(i => {
+      if (!i.pay || !i.pay.includes('$')) return false;
+      const count = parseInt(i.availableTasksFor.replace(/\D/g, '') || '0', 10);
+      return count > 0;
+    }));
   }
 
-  // dashboardMerchTargeting.projects — only those with pay
+  // dashboardMerchTargeting.projects — only those with pay AND tasks
   if (props.dashboardMerchTargeting?.projects) {
-    items.push(...props.dashboardMerchTargeting.projects.filter(i => i.pay && i.pay.includes('$')));
+    items.push(...props.dashboardMerchTargeting.projects.filter(i => {
+      if (!i.pay || !i.pay.includes('$')) return false;
+      const count = parseInt(i.availableTasksFor.replace(/\D/g, '') || '0', 10);
+      return count > 0;
+    }));
   }
 
-  // dashboardMerchTargeting.qualifications — ALL qualifications regardless of pay
+  // dashboardMerchTargeting.qualifications — only if they have tasks
   if (props.dashboardMerchTargeting?.qualifications) {
-    items.push(...props.dashboardMerchTargeting.qualifications);
+    items.push(...props.dashboardMerchTargeting.qualifications.filter(i => {
+      const count = parseInt(i.availableTasksFor.replace(/\D/g, '') || '0', 10);
+      return count > 0;
+    }));
   }
 
   return items;

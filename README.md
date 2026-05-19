@@ -1,6 +1,6 @@
 # Auto Checker
 
-Monitors DataAnnotation projects API on a random 5-30 minute schedule and sends WhatsApp alerts via WAHA when new paid projects or qualifications are detected.
+Monitors DataAnnotation projects API on a random 10-30 minute schedule (during 7AM–11PM local time) and sends WhatsApp alerts via WAHA when new paid projects or qualifications with available tasks are detected.
 
 ## Quick Start (Local Development)
 
@@ -27,6 +27,9 @@ npm run dev
 | `JWT_SECRET` | Secret for signing session JWT (min 32 chars) | Yes |
 | `CRON_SECRET` | Secret token for GitHub Actions cron calls | Yes |
 | `ADMIN_PASSWORD` | Login password (set via Railway env vars) | No |
+| `TIMEZONE_OFFSET` | Timezone offset in hours from UTC (default: 7 for WIB) | No |
+| `DAY_START_HOUR` | Earliest hour to run checks (default: 7) | No |
+| `DAY_END_HOUR` | Latest hour to run checks (default: 23) | No |
 
 ## Deployment (Railway)
 
