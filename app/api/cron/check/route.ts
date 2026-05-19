@@ -3,16 +3,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkers } from '@/lib/checkers';
 import { kvGet, kvSet } from '@/lib/kv';
 
-function isWithinTimeWindow(): boolean {
-  const tzOffset = parseInt(process.env.TIMEZONE_OFFSET ?? '7', 10);
-  const startHour = parseInt(process.env.DAY_START_HOUR ?? '7', 10);
-  const endHour = parseInt(process.env.DAY_END_HOUR ?? '23', 10);
+interface AppSettings {
+  timezoneOffset: number;
+  dayStartHour: number;
+  dayEndHour: number;
+}
 
+async function getAppSettings(): Promise<AppSettings> {
+  const settings = await kvGet<AppSettings>('app_settings');
+  return settings ?? { timezoneOffset: 7, dayStartHour: 7, dayEndHour: 23 };
+}
+
+function isWithinTimeWindow(settings: AppSettings): boolean {
   const now = new Date();
-  const local = new Date(now.getTime() + tzOffset * 60 * 60 * 1000);
+  const local = new Date(now.getTime() + settings.timezoneOffset * 60 * 60 * 1000);
   const hour = local.getUTCHours();
-
-  return hour >= startHour && hour <= endHour;
+  return hour >= settings.dayStartHour && hour <= settings.dayEndHour;
 }
 
 function randomBetween(min: number, max: number): number {
@@ -22,9 +28,10 @@ function randomBetween(min: number, max: number): number {
 export async function GET(req: NextRequest) {
   // Manual trigger from dashboard uses x-cron-secret: 'manual'
   const isManual = req.headers.get('x-cron-secret') === 'manual';
+  const settings = await getAppSettings();
 
   // Time window check (skip for manual triggers)
-  if (!isManual && !isWithinTimeWindow()) {
+  if (!isManual && !isWithinTimeWindow(settings)) {
     return NextResponse.json({ message: 'Outside time window' });
   }
 

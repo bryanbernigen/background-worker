@@ -10,11 +10,12 @@ async function safeGet<T>(key: string): Promise<T | null> {
 }
 
 export async function GET() {
-  const [lastChecked, nextAllowed, cookie, activity] = await Promise.all([
+  const [lastChecked, nextAllowed, cookie, activity, settings] = await Promise.all([
     safeGet<string>('last_checked'),
     safeGet<string>('next_allowed_run'),
     safeGet<string>('da_cookie'),
     safeGet<Array<{ timestamp: string; type: string; message: string }>>('activity_log'),
+    safeGet<{ timezoneOffset: number; dayStartHour: number; dayEndHour: number }>('app_settings'),
   ]);
 
   let status: 'running' | 'sleeping' | 'auth_error' | 'no_cookie' = 'sleeping';
@@ -25,5 +26,6 @@ export async function GET() {
     nextCheck: nextAllowed,
     status,
     activity: activity ?? [],
+    settings: settings ?? { timezoneOffset: 7, dayStartHour: 7, dayEndHour: 23 },
   });
 }
