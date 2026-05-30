@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import dynamic from 'next/dynamic';
 import { fetchDataAnnotationPage } from './fetch';
 import { parseDataAnnotation, extractPaidItems } from './parse';
 import { formatNotification } from './format';
@@ -7,12 +6,11 @@ import { diffNewItems } from './diff';
 import { decrypt } from '@/lib/crypto';
 import { WahaClient } from '@/lib/waha';
 import type { JobModule, RunContext, RunResult } from '../types';
+import CustomSettingsPanel from './settings-panel';
 
 export const customSettingsSchema = z.object({
   cookie_encrypted: z.string().optional(),
 });
-
-const CustomSettingsPanel = dynamic(() => import('./settings-panel'), { ssr: false });
 
 export const dataAnnotation: JobModule = {
   slug: 'data-annotation',
