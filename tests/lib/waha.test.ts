@@ -33,11 +33,20 @@ describe('WahaClient', () => {
     );
   });
 
-  it('returns false on API failure', async () => {
+  it('returns false on non-OK HTTP response', async () => {
     mockPost.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ success: false }),
+      ok: false,
+      json: () => Promise.resolve({ error: 'rate_limited' }),
     });
+
+    const client = new WahaClient('http://localhost:3001');
+    const result = await client.sendText('6281234567890', 'Test');
+
+    expect(result).toBe(false);
+  });
+
+  it('returns false when fetch throws', async () => {
+    mockPost.mockRejectedValueOnce(new Error('network down'));
 
     const client = new WahaClient('http://localhost:3001');
     const result = await client.sendText('6281234567890', 'Test');
