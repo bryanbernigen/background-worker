@@ -1,21 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { createSessionToken } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { username, password } = body;
+  const { username, password } = await req.json();
 
   const adminUser = process.env.ADMIN_USERNAME || 'admin';
-  const adminPass = process.env.ADMIN_PASSWORD || 'P@ssword123';
+  const adminHash = process.env.ADMIN_PASSWORD_HASH;
 
-  if (username !== adminUser || password !== adminPass) {
+  if (!adminHash) {
+    return NextResponse.json({ error: 'Server misconfigured: ADMIN_PASSWORD_HASH missing' }, { status: 500 });
+  }
+  if (username !== adminUser || !(await bcrypt.compare(password, adminHash))) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }
 
   const token = await createSessionToken(username);
-
-  const baseUrl = process.env.RAILWAY_APP_URL || req.headers.get('origin') || 'https://auto-checker-app-production.up.railway.app';
-  const res = NextResponse.redirect(new URL('/dashboard', baseUrl));
+  const origin = req.headers.get('origin') ?? new URL(req.url).origin;
+  const res = NextResponse.redirect(new URL('/dashboard', origin));
   res.cookies.set('session', token, {
     httpOnly: true,
     secure: true,
@@ -23,6 +25,5 @@ export async function POST(req: NextRequest) {
     maxAge: 60 * 60 * 24 * 7,
     path: '/',
   });
-
   return res;
 }
