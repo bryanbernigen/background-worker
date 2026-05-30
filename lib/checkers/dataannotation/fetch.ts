@@ -1,4 +1,18 @@
 export async function fetchDataAnnotationPage(cookie: string): Promise<string> {
+  // Use local example file when DATAANNOTATION_USE_LOCAL=true
+  if (process.env.DATAANNOTATION_USE_LOCAL === 'true') {
+    try {
+      const { readFileSync, existsSync } = await import('node:fs');
+      const { join } = await import('node:path');
+      const examplePath = join(process.cwd(), 'example_response.html');
+      if (existsSync(examplePath)) {
+        return readFileSync(examplePath, 'utf8');
+      }
+    } catch {
+      // Fall through to live URL
+    }
+  }
+
   const res = await fetch('https://app.dataannotation.tech/workers/projects', {
     headers: {
       'Cookie': cookie,

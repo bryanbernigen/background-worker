@@ -38,7 +38,8 @@
       "Bash(railway logs *)",
       "Bash(mkdir -p .git/hooks)",
       "Bash(cat)",
-      "Bash(chmod +x .git/hooks/pre-commit)"
+      "Bash(chmod +x .git/hooks/pre-commit)",
+      "Bash(npm run *)"
     ]
   },
   "enabledPlugins": {

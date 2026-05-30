@@ -30,34 +30,33 @@ export function parseDataAnnotation(html: string): DataAnnotationProps | null {
   }
 }
 
+function hasTasks(s: string): boolean {
+  return parseInt(s.replace(/\D/g, '') || '0', 10) > 0;
+}
+
 export function extractPaidItems(props: DataAnnotationProps): PaidItem[] {
   const items: PaidItem[] = [];
 
-  // reportableProjectsInfo — only those with pay AND tasks
+  // All items with tasks > 0 (paid + unpaid) — used for diff tracking
   if (props.reportableProjectsInfo) {
-    items.push(...props.reportableProjectsInfo.filter(i => {
-      if (!i.pay || !i.pay.includes('$')) return false;
-      const count = parseInt(i.availableTasksFor.replace(/\D/g, '') || '0', 10);
-      return count > 0;
-    }));
+    items.push(...props.reportableProjectsInfo.filter(i => hasTasks(i.availableTasksFor)));
   }
-
-  // dashboardMerchTargeting.projects — only those with pay AND tasks
   if (props.dashboardMerchTargeting?.projects) {
-    items.push(...props.dashboardMerchTargeting.projects.filter(i => {
-      if (!i.pay || !i.pay.includes('$')) return false;
-      const count = parseInt(i.availableTasksFor.replace(/\D/g, '') || '0', 10);
-      return count > 0;
-    }));
+    items.push(...props.dashboardMerchTargeting.projects.filter(i => hasTasks(i.availableTasksFor)));
   }
-
-  // dashboardMerchTargeting.qualifications — only if they have tasks
   if (props.dashboardMerchTargeting?.qualifications) {
-    items.push(...props.dashboardMerchTargeting.qualifications.filter(i => {
-      const count = parseInt(i.availableTasksFor.replace(/\D/g, '') || '0', 10);
-      return count > 0;
-    }));
+    items.push(...props.dashboardMerchTargeting.qualifications.filter(i => hasTasks(i.availableTasksFor)));
   }
 
-  return items;
+  // deduplicate by id
+  const seen = new Set<string>();
+  return items.filter(i => {
+    if (seen.has(i.id)) return false;
+    seen.add(i.id);
+    return true;
+  });
+}
+
+export function isPaidItem(item: PaidItem): boolean {
+  return !!item.pay?.includes('$');
 }

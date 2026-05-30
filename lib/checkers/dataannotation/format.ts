@@ -1,14 +1,15 @@
 import type { PaidItem } from '../types';
 
 export function formatNotification(items: PaidItem[]): string {
-  const projectItems = items.filter(i => !i.qualification);
+  // Rule 2: only paid projects + all qualifications
+  const paidProjectItems = items.filter(i => !i.qualification && i.pay?.includes('$'));
   const qualItems = items.filter(i => i.qualification);
 
   let msg = '';
 
-  if (projectItems.length > 0) {
+  if (paidProjectItems.length > 0) {
     msg += '🎯 *DataAnnotation — New Paid Projects!*\n\n';
-    for (const item of projectItems) {
+    for (const item of paidProjectItems) {
       msg += `🆕 ${item.name}\n💰 ${item.pay}\n📋 Tasks: ${item.availableTasksFor}\n\n`;
     }
   }

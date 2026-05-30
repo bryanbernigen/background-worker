@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { kvGet } from '@/lib/kv';
 import { WahaClient } from '@/lib/waha';
 
+
 export async function POST() {
   const waRecipient = await kvGet<string>('wa_recipient');
   if (!waRecipient) {

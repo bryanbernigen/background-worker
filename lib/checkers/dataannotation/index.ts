@@ -1,20 +1,24 @@
 import { fetchDataAnnotationPage } from './fetch';
-import { parseDataAnnotation, extractPaidItems } from './parse';
+import { parseDataAnnotation, extractPaidItems, isPaidItem } from './parse';
 import { diffItems, type DiffResult } from './diff';
 import { formatNotification } from './format';
 import { kvGet, kvSet } from '@/lib/kv';
 import { WahaClient } from '@/lib/waha';
-import type { Checker, PaidItem } from '../types';
+import type { Checker, CheckerResult, PaidItem } from '../types';
 
 interface LastSeen {
   items: PaidItem[];
   updatedAt: string;
 }
 
+function hasTasks(s: string): boolean {
+  return parseInt(s.replace(/\D/g, '') || '0', 10) > 0;
+}
+
 export const dataAnnotationChecker: Checker = {
   name: 'DataAnnotation',
 
-  async run(): Promise<{ checkerName: string; newItems: PaidItem[]; errors: string[] }> {
+  async run(): Promise<CheckerResult> {
     const errors: string[] = [];
 
     // 1. Get cookie
@@ -38,10 +42,29 @@ export const dataAnnotationChecker: Checker = {
     // 3. Parse
     const props = parseDataAnnotation(html);
     if (!props) {
-      return { checkerName: 'DataAnnotation', newItems: [], errors: ['Failed to parse response'] };
+      return {
+        checkerName: 'DataAnnotation',
+        newItems: [],
+        errors: [
+          `Failed to parse response (HTML length: ${html.length})`,
+          `WorkerProjectsTable: ${html.includes('WorkerProjectsTable')}`,
+          `data-props: ${html.includes('data-props')}`,
+          `reportableProjectsInfo: ${html.includes('reportableProjectsInfo')}`,
+          `dashboardMerchTargeting: ${html.includes('dashboardMerchTargeting')}`,
+          `HTML snippet: ${html.substring(0, 300)}`,
+        ],
+      };
     }
 
     const currentItems = extractPaidItems(props);
+    const debug = {
+      htmlLen: html.length,
+      // Only items with tasks > 0 (matches what gets extracted)
+      reportableProjectsInfo: (props.reportableProjectsInfo ?? []).filter(i => hasTasks(i.availableTasksFor)).map(i => ({ name: i.name, pay: i.pay, tasks: i.availableTasksFor, qual: i.qualification, paid: isPaidItem(i) })),
+      merchProjects: (props.dashboardMerchTargeting?.projects ?? []).filter(i => hasTasks(i.availableTasksFor)).map(i => ({ name: i.name, pay: i.pay, tasks: i.availableTasksFor, qual: i.qualification, paid: isPaidItem(i) })),
+      merchQuals: (props.dashboardMerchTargeting?.qualifications ?? []).filter(i => hasTasks(i.availableTasksFor)).map(i => ({ name: i.name, pay: i.pay, tasks: i.availableTasksFor, qual: i.qualification, paid: isPaidItem(i) })),
+      extracted: currentItems.map(i => ({ name: i.name, pay: i.pay, tasks: i.availableTasksFor, qual: i.qualification, paid: isPaidItem(i) })),
+    };
 
     // 4. Diff against last seen
     const lastSeen = await kvGet<LastSeen>('da_last_seen');
@@ -83,6 +106,7 @@ export const dataAnnotationChecker: Checker = {
       checkerName: 'DataAnnotation',
       newItems: diff.newItems,
       errors,
+      debug,
     };
   },
 };

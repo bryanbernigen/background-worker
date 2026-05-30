@@ -6,6 +6,7 @@ services:
     environment:
       WAHA_SESSION: default
       WAHA_SESSION_AUTO_START: "true"
+      WHATSAPP_DEFAULT_ENGINE: "NOWEB"
     volumes:
       - waha_data:/app/.wahaSessions
     ports:

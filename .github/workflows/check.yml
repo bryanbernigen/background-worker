@@ -11,5 +11,7 @@ jobs:
     steps:
       - name: Call Railway cron tick endpoint
         run: |
+          # Random sleep 0-60 seconds to spread out checks
+          sleep $((RANDOM % 60))
           curl -X GET "${{ secrets.RAILWAY_APP_URL }}/api/cron/tick" \
             -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
