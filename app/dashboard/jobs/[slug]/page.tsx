@@ -51,7 +51,12 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
             <p className="text-sm text-gray-500">{job.description}</p>
           </div>
           <div className="text-right space-y-2">
-            <Countdown nextRunAt={job.nextRunAt?.toISOString() ?? null} />
+            <Countdown slug={slug} initial={{
+              nextRunAt: job.nextRunAt?.toISOString() ?? null,
+              lastRunAt: job.lastRunAt?.toISOString() ?? null,
+              minIntervalS: job.minIntervalS,
+              maxIntervalS: job.maxIntervalS,
+            }} />
             <RunNowButton slug={slug} />
           </div>
         </header>
