@@ -1,0 +1,86 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+import { db } from '@/lib/db/client';
+import { jobs } from '@/lib/db/schema';
+import { requireSession } from '@/lib/api/require-session';
+import { encrypt } from '@/lib/crypto';
+import { getJob } from '@/lib/jobs/registry';
+import { reschedule } from '@/lib/scheduler';
+
+const metaSchema = z.object({
+  title:       z.string().min(1).optional(),
+  url:         z.string().url().optional(),
+  description: z.string().optional(),
+}).strict();
+
+const scheduleSchema = z.object({
+  minIntervalS: z.number().int().min(30).max(86400).optional(),
+  maxIntervalS: z.number().int().min(30).max(86400).optional(),
+  dayStartHour: z.number().int().min(0).max(23).optional(),
+  dayEndHour:   z.number().int().min(1).max(24).optional(),
+  tzOffsetH:    z.number().int().min(-12).max(14).optional(),
+  enabled:      z.boolean().optional(),
+}).strict();
+
+const bodySchema = z.object({
+  meta:     metaSchema.optional(),
+  schedule: scheduleSchema.optional(),
+  custom:   z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const guard = await requireSession();
+  if (!guard.ok) return guard.res;
+  const { slug } = await params;
+
+  const parsed = bodySchema.safeParse(await req.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
+  }
+  const body = parsed.data;
+
+  const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
+  if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+
+  const mod = getJob(slug);
+  if (!mod) return NextResponse.json({ error: 'no registered module' }, { status: 500 });
+
+  let newCustom = job.customSettings as Record<string, unknown>;
+  if (body.custom) {
+    // Per-job transforms: a `cookie` key is encrypted into `cookie_encrypted`.
+    const incoming: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(body.custom)) {
+      if (k === 'cookie' && typeof v === 'string') {
+        incoming.cookie_encrypted = encrypt(v);
+      } else {
+        incoming[k] = v;
+      }
+    }
+    newCustom = { ...newCustom, ...incoming };
+
+    if (mod.customSettingsSchema) {
+      const r = mod.customSettingsSchema.safeParse(newCustom);
+      if (!r.success) return NextResponse.json({ error: r.error.issues }, { status: 400 });
+    }
+  }
+
+  const min = body.schedule?.minIntervalS ?? job.minIntervalS;
+  const max = body.schedule?.maxIntervalS ?? job.maxIntervalS;
+  if (min > max) return NextResponse.json({ error: 'minIntervalS > maxIntervalS' }, { status: 400 });
+
+  const startH = body.schedule?.dayStartHour ?? job.dayStartHour;
+  const endH   = body.schedule?.dayEndHour   ?? job.dayEndHour;
+  if (startH >= endH) return NextResponse.json({ error: 'dayStartHour >= dayEndHour' }, { status: 400 });
+
+  await db.update(jobs).set({
+    ...(body.meta ?? {}),
+    ...(body.schedule ?? {}),
+    customSettings: newCustom,
+    updatedAt: new Date(),
+  }).where(eq(jobs.id, job.id));
+
+  await reschedule(job.id);
+
+  return NextResponse.json({ ok: true });
+}
