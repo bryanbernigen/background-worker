@@ -7,8 +7,23 @@ import { computeNextRunAt, isWithinWindow } from './window';
 import { withJobLock } from './lock';
 import { WahaClient } from '@/lib/waha';
 
-const timers = new Map<number, NodeJS.Timeout>();
-let started = false;
+// HMR-safe: stash scheduler state on globalThis so dev-mode module reloads
+// don't double-arm timers. Without this, Next.js HMR re-evaluates this module,
+// resets the local `timers` map, and re-arms timeouts — but the old timeouts
+// remain scheduled in Node's event loop, causing concurrent runs that race
+// on the advisory lock and produce a spurious skipped-lock_busy row.
+declare global {
+  // eslint-disable-next-line no-var
+  var __schedulerTimers: Map<number, NodeJS.Timeout> | undefined;
+  // eslint-disable-next-line no-var
+  var __schedulerStarted: boolean | undefined;
+}
+
+const timers: Map<number, NodeJS.Timeout> =
+  globalThis.__schedulerTimers ?? (globalThis.__schedulerTimers = new Map());
+
+function isStarted(): boolean { return globalThis.__schedulerStarted === true; }
+function setStarted(v: boolean): void { globalThis.__schedulerStarted = v; }
 
 type Trigger = 'scheduled' | 'manual';
 
@@ -17,10 +32,10 @@ export interface ManualRunOutcome {
   result?: RunResult;
 }
 
-/** Boot the scheduler. Idempotent. */
+/** Boot the scheduler. Idempotent across module reloads (HMR). */
 export async function start(): Promise<void> {
-  if (started) return;
-  started = true;
+  if (isStarted()) return;
+  setStarted(true);
   const all = await db.select().from(jobs).where(eq(jobs.enabled, true));
   for (const job of all) await armTimer(job.id);
   process.on('unhandledRejection', err => {
@@ -33,7 +48,7 @@ export async function start(): Promise<void> {
 export function stop(): void {
   for (const t of timers.values()) clearTimeout(t);
   timers.clear();
-  started = false;
+  setStarted(false);
 }
 
 /** Re-read job from DB and re-arm its timer. Call after settings change. */
@@ -55,6 +70,10 @@ export async function runManual(jobId: number): Promise<ManualRunOutcome> {
 async function armTimer(jobId: number): Promise<void> {
   const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
   if (!job || !job.enabled) return;
+
+  // Clear any pre-existing timer first — defensive against double-arming.
+  const prev = timers.get(jobId);
+  if (prev) clearTimeout(prev);
 
   const now = new Date();
   let target = job.nextRunAt;
