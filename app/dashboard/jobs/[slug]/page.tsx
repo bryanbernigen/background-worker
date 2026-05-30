@@ -6,7 +6,7 @@ import { db } from '@/lib/db/client';
 import { jobs } from '@/lib/db/schema';
 import { getJob } from '@/lib/jobs/registry';
 import { decrypt } from '@/lib/crypto';
-import MetaForm from './meta-form';
+import EditableHeader from './editable-header';
 import ScheduleForm from './schedule-form';
 import RecipientsPanel from './recipients-panel';
 import HistoryTable from './history-table';
@@ -45,23 +45,22 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
       <div className="max-w-4xl mx-auto space-y-6">
         <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</a>
 
-        <header className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{job.title}</h1>
-            <p className="text-sm text-gray-500">{job.description}</p>
-          </div>
-          <div className="text-right space-y-2">
-            <Countdown slug={slug} initial={{
-              nextRunAt: job.nextRunAt?.toISOString() ?? null,
-              lastRunAt: job.lastRunAt?.toISOString() ?? null,
-              minIntervalS: job.minIntervalS,
-              maxIntervalS: job.maxIntervalS,
-            }} />
+        <EditableHeader slug={slug} initial={{
+          title: job.title, url: job.url, description: job.description,
+        }} />
+
+        <div className="flex items-center gap-4">
+          <Countdown slug={slug} initial={{
+            nextRunAt: job.nextRunAt?.toISOString() ?? null,
+            lastRunAt: job.lastRunAt?.toISOString() ?? null,
+            minIntervalS: job.minIntervalS,
+            maxIntervalS: job.maxIntervalS,
+          }} />
+          <div className="shrink-0">
             <RunNowButton slug={slug} />
           </div>
-        </header>
+        </div>
 
-        <MetaForm slug={slug} initial={{ title: job.title, url: job.url, description: job.description }} />
         <ScheduleForm slug={slug} initial={{
           minIntervalS: job.minIntervalS, maxIntervalS: job.maxIntervalS,
           dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
