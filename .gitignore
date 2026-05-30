@@ -43,3 +43,6 @@ next-env.d.ts
 
 # git worktrees
 /.worktrees
+
+# local sample data
+example_response.html
