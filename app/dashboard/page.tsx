@@ -1,70 +1,66 @@
-'use client';
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { desc, eq } from 'drizzle-orm';
+import { verifySessionToken } from '@/lib/auth';
+import { db } from '@/lib/db/client';
+import { jobs, runHistory } from '@/lib/db/schema';
+import { jobRegistry } from '@/lib/jobs/registry';
 import Card from '@/components/ui/card';
 import Badge from '@/components/ui/badge';
 import Button from '@/components/ui/button';
 
-const CHECKERS = [
-  {
-    slug: 'data-annotation',
-    name: 'Data Annotation',
-    description: 'Monitor paid projects and qualifications',
-    emoji: '📋',
-  },
-];
-
-function CheckerCard({ checker }: { checker: typeof CHECKERS[0] }) {
-  const [status, setStatus] = useState<string>('unknown');
-
-  useEffect(() => {
-    fetch('/api/status')
-      .then(r => r.json())
-      .then(d => setStatus(d.status ?? 'unknown'))
-      .catch(() => setStatus('unknown'));
-  }, []);
-
-  const statusColor = status === 'running' ? 'green'
-    : status === 'auth_error' ? 'red'
-    : status === 'no_cookie' ? 'orange'
-    : 'gray';
-
-  return (
-    <Card>
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{checker.emoji}</span>
-          <h2 className="text-lg font-semibold">{checker.name}</h2>
-        </div>
-        <Badge color={statusColor}>{status}</Badge>
-      </div>
-      <p className="text-sm text-gray-500 mb-4">{checker.description}</p>
-      <Link href={`/dashboard/${checker.slug}`}>
-        <Button className="bg-blue-600 text-white hover:bg-blue-700">Open</Button>
-      </Link>
-    </Card>
-  );
+async function latestStatus(jobId: number): Promise<{ status: string; when: Date | null }> {
+  const [row] = await db.select({ status: runHistory.status, startedAt: runHistory.startedAt })
+    .from(runHistory).where(eq(runHistory.jobId, jobId))
+    .orderBy(desc(runHistory.startedAt)).limit(1);
+  return { status: row?.status ?? 'idle', when: row?.startedAt ?? null };
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const token = (await cookies()).get('session')?.value;
+  if (!token || !(await verifySessionToken(token))) redirect('/');
+
+  const rows = await db.select().from(jobs);
+  const data = await Promise.all(rows.map(async j => ({
+    job: j,
+    inRegistry: jobRegistry.some(m => m.slug === j.slug),
+    ...(await latestStatus(j.id)),
+  })));
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
+        <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Auto Checker</h1>
-          <div className="flex gap-4">
-            <Link href="/dashboard/settings" className="text-sm text-gray-500 hover:text-gray-700">Settings</Link>
-            <form action="/api/auth/logout" method="POST">
-              <button className="text-sm text-gray-500 hover:text-gray-700">Logout</button>
-            </form>
-          </div>
-        </div>
+          <form action="/api/auth/logout" method="POST">
+            <button className="text-sm text-gray-500 hover:text-gray-700">Logout</button>
+          </form>
+        </header>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {CHECKERS.map(checker => (
-            <CheckerCard key={checker.slug} checker={checker} />
+          {data.map(({ job, inRegistry, status, when }) => (
+            <Card key={job.id}>
+              <div className="flex items-start justify-between mb-2">
+                <h2 className="text-lg font-semibold">{job.title}</h2>
+                <Badge color={badgeColor(status, inRegistry)}>{inRegistry ? status : 'orphan'}</Badge>
+              </div>
+              <p className="text-sm text-gray-500 mb-2">{job.description}</p>
+              {when && <p className="text-xs text-gray-400 mb-4">Last run: {when.toLocaleString()}</p>}
+              <Link href={`/dashboard/jobs/${job.slug}`}>
+                <Button className="bg-blue-600 text-white hover:bg-blue-700">Open</Button>
+              </Link>
+            </Card>
           ))}
         </div>
       </div>
     </div>
   );
+}
+
+function badgeColor(status: string, inRegistry: boolean): 'green' | 'red' | 'orange' | 'gray' {
+  if (!inRegistry) return 'orange';
+  if (status === 'ok') return 'green';
+  if (status === 'error') return 'red';
+  if (status === 'skipped') return 'gray';
+  return 'gray';
 }
