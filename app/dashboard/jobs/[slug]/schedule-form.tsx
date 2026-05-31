@@ -5,7 +5,6 @@ import { formatDurationS } from '@/lib/format-duration';
 interface Initial {
   minIntervalS: number; maxIntervalS: number;
   dayStartHour: number; dayEndHour: number; tzOffsetH: number;
-  enabled: boolean;
 }
 
 export default function ScheduleForm({ slug, initial }: { slug: string; initial: Initial }) {
@@ -39,10 +38,6 @@ export default function ScheduleForm({ slug, initial }: { slug: string; initial:
           onChange={v => setS({ ...s, dayEndHour: v })} />
         <NumField label="Timezone offset" suffix="hours" hint={`UTC${s.tzOffsetH >= 0 ? '+' : ''}${s.tzOffsetH}`} value={s.tzOffsetH}
           onChange={v => setS({ ...s, tzOffsetH: v })} />
-        <label className="flex items-end gap-2">
-          <input type="checkbox" checked={s.enabled} onChange={e => setS({ ...s, enabled: e.target.checked })} />
-          <span className="text-sm">Enabled</span>
-        </label>
       </div>
       <button disabled={busy} onClick={save}
         className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50">Save</button>

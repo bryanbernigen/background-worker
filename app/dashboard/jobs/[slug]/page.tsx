@@ -8,6 +8,7 @@ import { getJob } from '@/lib/jobs/registry';
 import { decrypt } from '@/lib/crypto';
 import EditableHeader from './editable-header';
 import ScheduleForm from './schedule-form';
+import EnableToggle from './enable-toggle';
 import RecipientsPanel from './recipients-panel';
 import HistoryTable from './history-table';
 import Countdown from './countdown';
@@ -56,15 +57,15 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
             minIntervalS: job.minIntervalS,
             maxIntervalS: job.maxIntervalS,
           }} />
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-start gap-2">
             <RunNowButton slug={slug} />
+            <EnableToggle slug={slug} initialEnabled={job.enabled} />
           </div>
         </div>
 
         <ScheduleForm slug={slug} initial={{
           minIntervalS: job.minIntervalS, maxIntervalS: job.maxIntervalS,
           dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
-          enabled: job.enabled,
         }} />
         {Panel && <Panel jobId={job.id} current={customForPanel} />}
         <RecipientsPanel slug={slug} />
