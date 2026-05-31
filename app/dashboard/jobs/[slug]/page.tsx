@@ -56,6 +56,7 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
             lastRunAt: job.lastRunAt?.toISOString() ?? null,
             minIntervalS: job.minIntervalS,
             maxIntervalS: job.maxIntervalS,
+            enabled: job.enabled,
           }} />
           <div className="shrink-0 flex items-start gap-2">
             <RunNowButton slug={slug} />

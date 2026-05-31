@@ -7,15 +7,20 @@ interface JobSnapshot {
   lastRunAt: string | null;
   minIntervalS: number;
   maxIntervalS: number;
+  enabled: boolean;
 }
 
 export default function Countdown({ slug, initial }: { slug: string; initial: JobSnapshot }) {
   const [snapshot, setSnapshot] = useState<JobSnapshot>(initial);
-  const [now, setNow] = useState(() => Date.now());
+  // `now` starts null so the first client render matches the server render
+  // (both render the "loading" placeholder), avoiding a hydration mismatch
+  // from Date.now()/locale formatting. It's populated immediately after mount.
+  const [now, setNow] = useState<number | null>(null);
   const lastKnownRunAt = useRef<string | null>(initial.lastRunAt);
 
   // Local clock — 1s tick drives the visible animation.
   useEffect(() => {
+    setNow(Date.now());
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -32,6 +37,7 @@ export default function Countdown({ slug, initial }: { slug: string; initial: Jo
         setSnapshot({
           nextRunAt: j.nextRunAt, lastRunAt: j.lastRunAt,
           minIntervalS: j.minIntervalS, maxIntervalS: j.maxIntervalS,
+          enabled: j.enabled,
         });
         lastKnownRunAt.current = j.lastRunAt;
       } catch { /* swallow */ }
@@ -40,27 +46,34 @@ export default function Countdown({ slug, initial }: { slug: string; initial: Jo
     return () => { cancelled = true; clearInterval(t); };
   }, [slug]);
 
+  const mounted = now !== null;
   const nextRunMs = snapshot.nextRunAt ? new Date(snapshot.nextRunAt).getTime() : null;
-  const remainingS = nextRunMs ? (nextRunMs - now) / 1000 : null;
-  const isRunning = nextRunMs != null && now > nextRunMs;
+  const remainingS = mounted && nextRunMs ? (nextRunMs - now) / 1000 : null;
+  const isRunning = mounted && nextRunMs != null && now > nextRunMs;
+  const paused = !snapshot.enabled;
 
   return (
     <div className="flex-1 min-w-0">
       <ProgressBar
-        remainingS={remainingS}
+        remainingS={paused ? null : remainingS}
         minS={snapshot.minIntervalS}
         maxS={snapshot.maxIntervalS}
         running={isRunning}
+        muted={paused}
       />
       <div className="mt-1.5 text-sm flex items-center justify-between gap-3">
-        {isRunning && nextRunMs ? (
+        {paused ? (
+          <span className="text-gray-500">⏸ Paused — schedule disabled</span>
+        ) : !mounted ? (
+          <span className="text-gray-400">Calculating…</span>
+        ) : isRunning && nextRunMs ? (
           <span className="text-amber-700">
             Running for <strong>{formatDurationS((now - nextRunMs) / 1000)}</strong>…
           </span>
         ) : remainingS !== null && remainingS > 0 && nextRunMs ? (
           <span className="text-gray-700">
-            Next run in <strong>{formatDurationS(remainingS)}</strong>
-            <span className="text-gray-400"> · {formatClock(nextRunMs)}</span>
+            Next run at <strong>{formatClock(nextRunMs)}</strong>
+            <span className="text-gray-400"> · {formatDurationS(remainingS)}</span>
           </span>
         ) : (
           <span className="text-gray-500">No next run scheduled</span>
@@ -77,7 +90,7 @@ export default function Countdown({ slug, initial }: { slug: string; initial: Jo
 function formatClock(ms: number): string {
   const d = new Date(ms);
   const sameDay = new Date().toDateString() === d.toDateString();
-  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   if (sameDay) return time;
   const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   return `${date}, ${time}`;
@@ -88,6 +101,7 @@ interface BarProps {
   minS: number;
   maxS: number;
   running: boolean;
+  muted?: boolean;
 }
 
 /**
@@ -99,18 +113,17 @@ interface BarProps {
  * point a run could fire. Below that tick the bar is in the "could fire any
  * second now" zone.
  */
-function ProgressBar({ remainingS, minS, maxS, running }: BarProps) {
+function ProgressBar({ remainingS, minS, maxS, running, muted }: BarProps) {
   const denom = Math.max(maxS, 1);
   let fillPct = remainingS != null ? (remainingS / denom) * 100 : 0;
   fillPct = Math.max(0, Math.min(100, fillPct));
   const minTickPct = (minS / denom) * 100;
+  const fillColor = muted ? 'bg-gray-300' : running ? 'bg-amber-500 animate-pulse' : 'bg-blue-500';
 
   return (
-    <div className="relative w-full h-3 rounded-full bg-gray-200 overflow-hidden">
+    <div className={`relative w-full h-3 rounded-full overflow-hidden ${muted ? 'bg-gray-100' : 'bg-gray-200'}`}>
       <div
-        className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-linear ${
-          running ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'
-        }`}
+        className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-linear ${fillColor}`}
         style={{ width: `${fillPct}%` }}
       />
       <div

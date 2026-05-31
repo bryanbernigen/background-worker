@@ -69,11 +69,21 @@ export async function runManual(jobId: number): Promise<ManualRunOutcome> {
 
 async function armTimer(jobId: number): Promise<void> {
   const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
-  if (!job || !job.enabled) return;
+  if (!job) return;
 
   // Clear any pre-existing timer first — defensive against double-arming.
   const prev = timers.get(jobId);
   if (prev) clearTimeout(prev);
+  timers.delete(jobId);
+
+  // Disabled: ensure no timer AND clear nextRunAt so the UI shows "paused"
+  // rather than counting down toward a run that will never fire.
+  if (!job.enabled) {
+    if (job.nextRunAt) {
+      await db.update(jobs).set({ nextRunAt: null, updatedAt: new Date() }).where(eq(jobs.id, jobId));
+    }
+    return;
+  }
 
   const now = new Date();
   let target = job.nextRunAt;
