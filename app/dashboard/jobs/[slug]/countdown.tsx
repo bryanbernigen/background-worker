@@ -41,19 +41,13 @@ export default function Countdown({ slug, initial }: { slug: string; initial: Jo
   }, [slug]);
 
   const nextRunMs = snapshot.nextRunAt ? new Date(snapshot.nextRunAt).getTime() : null;
-  const lastRunMs = snapshot.lastRunAt ? new Date(snapshot.lastRunAt).getTime() : null;
   const remainingS = nextRunMs ? (nextRunMs - now) / 1000 : null;
   const isRunning = nextRunMs != null && now > nextRunMs;
-  // The actual span chosen for THIS run (last → next). Drives the fill so the
-  // bar reaches 0 exactly when the run fires. Falls back to maxIntervalS when
-  // there is no prior run yet.
-  const spanS = lastRunMs && nextRunMs ? Math.max(1, (nextRunMs - lastRunMs) / 1000) : snapshot.maxIntervalS;
 
   return (
     <div className="flex-1 min-w-0">
       <ProgressBar
         remainingS={remainingS}
-        spanS={spanS}
         minS={snapshot.minIntervalS}
         maxS={snapshot.maxIntervalS}
         running={isRunning}
@@ -63,9 +57,10 @@ export default function Countdown({ slug, initial }: { slug: string; initial: Jo
           <span className="text-amber-700">
             Running for <strong>{formatDurationS((now - nextRunMs) / 1000)}</strong>…
           </span>
-        ) : remainingS !== null && remainingS > 0 ? (
+        ) : remainingS !== null && remainingS > 0 && nextRunMs ? (
           <span className="text-gray-700">
             Next run in <strong>{formatDurationS(remainingS)}</strong>
+            <span className="text-gray-400"> · {formatClock(nextRunMs)}</span>
           </span>
         ) : (
           <span className="text-gray-500">No next run scheduled</span>
@@ -78,27 +73,37 @@ export default function Countdown({ slug, initial }: { slug: string; initial: Jo
   );
 }
 
+/** Local time + date-if-not-today, e.g. "4:58:42 PM" or "May 31, 7:00 AM". */
+function formatClock(ms: number): string {
+  const d = new Date(ms);
+  const sameDay = new Date().toDateString() === d.toDateString();
+  const time = d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (sameDay) return time;
+  const date = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${date}, ${time}`;
+}
+
 interface BarProps {
   remainingS: number | null;
-  spanS: number;
   minS: number;
   maxS: number;
   running: boolean;
 }
 
 /**
- * Bar fills to "time remaining until next run", anchored LEFT, and shrinks
- * smoothly toward 0 each second. Hits 0 exactly when the run fires.
+ * Bar width = time-remaining as a fraction of the MAXIMUM interval, so the
+ * scale is fixed and comparable: with max=40m, 20m remaining → 50%, 30m → 75%.
+ * Anchored LEFT, shrinks smoothly toward 0 each second.
  *
- * A vertical tick marks the "min interval" position on the [0, max] scale —
- * useful for seeing how close the schedule is to the earliest-possible
- * fire-time vs the latest.
+ * A vertical tick marks the min-interval position (minS/maxS) — the earliest
+ * point a run could fire. Below that tick the bar is in the "could fire any
+ * second now" zone.
  */
-function ProgressBar({ remainingS, spanS, minS, maxS, running }: BarProps) {
-  let fillPct = remainingS != null ? (remainingS / spanS) * 100 : 0;
+function ProgressBar({ remainingS, minS, maxS, running }: BarProps) {
+  const denom = Math.max(maxS, 1);
+  let fillPct = remainingS != null ? (remainingS / denom) * 100 : 0;
   fillPct = Math.max(0, Math.min(100, fillPct));
-  // Min tick (where bar would be when remaining=minIntervalS, i.e. earliest possible fire).
-  const minTickPct = (minS / Math.max(maxS, 1)) * 100;
+  const minTickPct = (minS / denom) * 100;
 
   return (
     <div className="relative w-full h-3 rounded-full bg-gray-200 overflow-hidden">
@@ -111,7 +116,7 @@ function ProgressBar({ remainingS, spanS, minS, maxS, running }: BarProps) {
       <div
         className="absolute inset-y-0 w-px bg-gray-500/60"
         style={{ left: `${minTickPct}%` }}
-        title={`min interval (${minS}s)`}
+        title={`min interval (${minS}s) — earliest possible fire`}
       />
     </div>
   );
