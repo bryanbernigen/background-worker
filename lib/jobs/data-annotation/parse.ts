@@ -1,7 +1,10 @@
 import type { PaidItem } from '@/lib/jobs/types';
 
 interface DataAnnotationProps {
-  reportableProjectsInfo?: PaidItem[];
+  // NOTE: reportableProjectsInfo is intentionally NOT scraped. It is a separate
+  // "projects you can report time on" list that the dashboard table never renders
+  // (the table is built from dashboardMerchTargeting only). Including it caused
+  // items like "Eevee" to be notified despite never appearing on the dashboard.
   dashboardMerchTargeting?: {
     qualifications?: PaidItem[];
     projects?: PaidItem[];
@@ -35,9 +38,6 @@ function hasTasks(s: string): boolean {
 export function extractPaidItems(props: DataAnnotationProps): PaidItem[] {
   const items: PaidItem[] = [];
 
-  if (props.reportableProjectsInfo) {
-    items.push(...props.reportableProjectsInfo.filter(i => hasTasks(i.availableTasksFor)));
-  }
   if (props.dashboardMerchTargeting?.projects) {
     items.push(...props.dashboardMerchTargeting.projects.filter(i => hasTasks(i.availableTasksFor)));
   }
