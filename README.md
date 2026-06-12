@@ -1,102 +1,115 @@
 # Auto Checker
 
-Monitors DataAnnotation projects API on a random 10-30 minute schedule (during 7AM–11PM local time) and sends WhatsApp alerts via WAHA when new paid projects or qualifications with available tasks are detected.
+Monitors the DataAnnotation projects API on a randomized interval (within a configurable daily window) and sends WhatsApp alerts via WAHA when new paid projects or qualifications with available tasks appear. Jobs, recipients, schedules, and the stored login cookie are all managed from the dashboard UI and persisted in PostgreSQL.
 
 ## Quick Start (Local Development)
 
 ```bash
-# Start WAHA (WhatsApp bridge)
-docker compose up -d waha
+# 1. Start WAHA (WhatsApp bridge) — exposes port 3001
+docker compose -f waha/docker-compose.yml up -d
 
+# 2. Start Postgres (any local instance works; example with Docker)
+docker run -d --name auto-checker-db -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=auto_checker postgres:16
+
+# 3. Install deps and configure env
 npm install
-cp .env.local.example .env.local
-# Fill in .env.local with your values
+cp .env.local.example .env.local   # fill in the values (see below)
+
+# 4. Run — migrations run automatically on boot
 npm run dev
 ```
 
-**WAHA runs on port 3001.** Open http://localhost:3001 to configure your WhatsApp session.
+**WAHA runs on http://localhost:3001.** Open it to scan the QR code and start your WhatsApp session. Then sign in to the app at http://localhost:3000, open a job, and configure its schedule, recipients, and session cookie from the UI.
 
 ## Environment Variables
 
 | Variable | Description | Required |
 |---|---|---|
-| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST URL | Yes |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token | Yes |
-| `WAHA_URL` | WAHA API base URL (e.g. http://localhost:3001) | Yes |
-| `WAHA_API_KEY` | WAHA API key (optional) | No |
-| `JWT_SECRET` | Secret for signing session JWT (min 32 chars) | Yes |
-| `CRON_SECRET` | Secret token for GitHub Actions cron calls | Yes |
-| `ADMIN_PASSWORD` | Login password (set via Railway env vars) | No |
-| `TIMEZONE_OFFSET` | Timezone offset in hours from UTC (default: 7 for WIB) | No |
-| `DAY_START_HOUR` | Earliest hour to run checks (default: 7) | No |
-| `DAY_END_HOUR` | Latest hour to run checks (default: 23) | No |
+| `DATABASE_URL` | PostgreSQL connection string | Yes |
+| `WAHA_URL` | WAHA API base URL (e.g. `http://localhost:3001`) | Yes |
+| `WAHA_API_KEY` | WAHA API key | No |
+| `JWT_SECRET` | Secret for signing the session JWT (min 32 chars) | Yes |
+| `ENCRYPTION_KEY` | 64 hex chars (32 bytes) — encrypts stored session cookies | Yes |
+| `ADMIN_USERNAME` | Login username (default: `admin`) | No |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash of the login password | Yes |
+| `DATAANNOTATION_USE_LOCAL` | Dev only — use a local HTML fixture instead of hitting the live site | No |
 
-## Deployment (Railway)
+Schedule settings (interval range, daily window, timezone offset) are **per-job** and live in the database — edit them from the dashboard, not via env vars.
 
-Everything deploys to Railway as Docker containers.
+### Generating secrets
 
-### 1. Upstash Redis
+```bash
+JWT_SECRET=$(openssl rand -base64 32)        # session signing key
+ENCRYPTION_KEY=$(openssl rand -hex 32)        # exactly 64 hex chars
+# bcrypt hash for ADMIN_PASSWORD_HASH:
+node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 10))" 'your-password'
+```
 
-1. Create free account at [upstash.com](https://upstash.com)
-2. Create a new Redis database
-3. Go to REST API tab → copy `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
+## Deployment (Northflank)
 
-### 2. Deploy to Railway
+The app and WAHA both deploy to Northflank as containers, backed by a managed Postgres addon. Migrations run automatically on first boot (`instrumentation.ts` → `runMigrations`), so there is no separate migration step.
 
-1. Push to GitHub (code is already on GitHub)
-2. Go to [railway.app](https://railway.app) → auto-checker project
-3. In the `auto-checker-app` service, configure source to use GitHub repo `bryanbernigen/auto-checker`, branch `main`
-4. Add environment variables:
-   - `UPSTASH_REDIS_REST_URL`
-   - `UPSTASH_REDIS_REST_TOKEN`
-   - `WAHA_URL` (use public URL: `https://auto-checker-waha-production.up.railway.app`)
-   - `WAHA_API_KEY` (from WAHA dashboard)
-   - `JWT_SECRET` — generate with `openssl rand -base64 32`
-   - `CRON_SECRET` — any random string
-5. Deploy
+### 1. PostgreSQL
 
-### 3. WAHA on Railway
+1. In your Northflank project, add a **PostgreSQL addon**.
+2. From the addon's connection details, copy the connection string into the app's `DATABASE_URL`. Prefer the **internal** connection string so traffic stays inside the project network.
 
-1. In the same Railway project, add a new service with Docker image: `devlikeapro/waha:latest`
-2. Add environment variables: `WAHA_SESSION=default`, `WAHA_DASHBOARD_USERNAME=admin`, `WAHA_DASHBOARD_PASSWORD=<your-password>`, `WAHA_API_KEY=<your-key>`
-3. Note the public URL from Railway (e.g. `https://auto-checker-waha-production.up.railway.app`)
-4. Update `auto-checker-app` `WAHA_URL` to the public WAHA URL
+### 2. Auto Checker app
 
-After WAHA deploys, open the WAHA dashboard URL, configure your WhatsApp session, and generate an API key if needed.
+1. Create a **Combined service** (build + deploy) from the GitHub repo `bryanbernigen/auto-checker`, branch `main`.
+2. Build from the included `Dockerfile` (Next.js standalone output).
+3. Expose **port 3000** with a public domain.
+4. Set environment variables / secrets:
+   - `DATABASE_URL` (from the Postgres addon)
+   - `WAHA_URL` (the WAHA service's internal URL — see below)
+   - `WAHA_API_KEY`
+   - `JWT_SECRET`, `ENCRYPTION_KEY`, `ADMIN_PASSWORD_HASH` (see [Generating secrets](#generating-secrets))
+   - `ADMIN_USERNAME` (optional; defaults to `admin`)
 
-### 4. GitHub Actions (for random scheduling)
+### 3. WAHA
 
-1. In your GitHub repo, go to Settings > Secrets and variables > Actions
-2. Add `CRON_SECRET` matching the value in Railway
-3. The workflow `.github/workflows/check.yml` runs every 1 minute and calls your Railway app URL
+1. Add a **Deployment service** from the Docker image `devlikeapro/waha:latest`.
+2. Environment: `WAHA_SESSION=default`, `WAHA_SESSION_AUTO_START=true`, `WHATSAPP_DEFAULT_ENGINE=NOWEB`, and a `WAHA_API_KEY`.
+3. Attach a **persistent volume** mounted at `/app/.wahaSessions` so the WhatsApp session survives restarts.
+4. Expose **port 3000**. Use its internal URL for the app's `WAHA_URL`; optionally expose a public domain to reach the WAHA dashboard.
+
+After WAHA is up, open its dashboard, scan the QR code to link WhatsApp, and confirm the API key.
 
 ## Architecture
 
-- **Next.js 15** (App Router, TypeScript) — UI and API routes
-- **Upstash Redis** — cookie storage, last-seen state, activity log
-- **GitHub Actions** — fires every 1 minute, Railway app handles scheduling logic
-- **WAHA** (Docker) — sends WhatsApp messages
+- **Next.js 16** (App Router, TypeScript) — dashboard UI and API routes
+- **PostgreSQL + Drizzle ORM** — jobs, recipients, run history, and encrypted session cookies; migrations applied automatically on boot
+- **In-process scheduler** (`lib/scheduler`, started from `instrumentation.ts`) — arms a per-job timer at a random interval within each job's daily window; no external cron needed
+- **WAHA** (Docker) — sends the WhatsApp messages
 
-## Adding New Checkers
+## Adding a New Job
 
-Create a new module in `lib/checkers/` implementing the `Checker` interface, then add it to `lib/checkers/index.ts`:
+Jobs are `JobModule`s registered in a registry and seeded into the database on boot. To add one:
 
 ```typescript
-// lib/checkers/mychecker/index.ts
-export const myChecker: Checker = {
-  name: 'MyChecker',
-  async run() {
-    // fetch, diff, notify logic
-    return { checkerName: 'MyChecker', newItems: [], errors: [] };
+// lib/jobs/mychecker/index.ts
+import type { JobModule, RunContext, RunResult } from '../types';
+
+export const myChecker: JobModule = {
+  slug: 'my-checker',
+  defaultMeta: {
+    title: 'My Checker',
+    url: 'https://example.com',
+    description: 'What this job monitors.',
+  },
+  // optional: customSettingsSchema (zod) + CustomSettingsPanel (React) for per-job settings
+  async runCheck(ctx: RunContext): Promise<RunResult> {
+    // fetch, diff against ctx.lastSuccessfulItems, notify ctx.recipients via WAHA
+    // ...
   },
 };
 ```
 
 ```typescript
-// lib/checkers/index.ts
+// lib/jobs/registry.ts
 import { myChecker } from './mychecker';
-export const checkers: Checker[] = [
-  dataAnnotationChecker,
-  myChecker, // add here
-];
+export const jobRegistry: JobModule[] = [dataAnnotation, myChecker]; // add here
 ```
+
+On the next boot, `seedRegistryJobs` inserts a row for any new slug; configure its schedule and recipients from the dashboard.
