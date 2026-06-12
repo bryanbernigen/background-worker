@@ -20,6 +20,9 @@ interface Detail extends Row {
 }
 
 type DetailState = Detail | 'loading' | undefined;
+type NotifiedFilter = 'all' | 'yes' | 'no';
+type StatusFilter   = 'all' | 'ok' | 'error' | 'skipped';
+type TriggerFilter  = 'all' | 'scheduled' | 'manual';
 
 const COL_COUNT = 9;
 
@@ -27,6 +30,9 @@ export default function HistoryTable({ slug }: { slug: string }) {
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [notified, setNotified] = useState<NotifiedFilter>('all');
+  const [status, setStatus]     = useState<StatusFilter>('all');
+  const [trigger, setTrigger]   = useState<TriggerFilter>('all');
   const pageSize = 25;
   const [open, setOpen] = useState<Record<number, DetailState>>({});
   const [loading, setLoading] = useState(false);
@@ -34,12 +40,22 @@ export default function HistoryTable({ slug }: { slug: string }) {
   const load = async (p: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/jobs/${slug}/history?page=${p}&pageSize=${pageSize}`);
+      const params = new URLSearchParams({ page: String(p), pageSize: String(pageSize) });
+      if (notified !== 'all') params.set('notified', notified);
+      if (status !== 'all')   params.set('status', status);
+      if (trigger !== 'all')  params.set('trigger', trigger);
+      const res = await fetch(`/api/jobs/${slug}/history?${params}`);
       const body = await res.json();
       setRows(body.rows ?? []); setTotal(body.total ?? 0);
     } finally { setLoading(false); }
   };
-  useEffect(() => { void load(page); }, [slug, page]);
+  useEffect(() => { void load(page); }, [slug, page, notified, status, trigger]);
+
+  // Changing any filter resets to page 1 (the load happens via the effect above).
+  const onFilter = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPage(1); };
+
+  const filtersActive = notified !== 'all' || status !== 'all' || trigger !== 'all';
+  const resetFilters = () => { setNotified('all'); setStatus('all'); setTrigger('all'); setPage(1); };
 
   const toggle = async (id: number) => {
     if (open[id]) { setOpen({ ...open, [id]: undefined }); return; }
@@ -56,7 +72,9 @@ export default function HistoryTable({ slug }: { slug: string }) {
       <header className="flex items-center justify-between px-5 py-3 border-b bg-gray-50">
         <div className="flex items-baseline gap-3">
           <h3 className="font-semibold">Run history</h3>
-          <span className="text-sm text-gray-500">{total} run{total === 1 ? '' : 's'}</span>
+          <span className="text-sm text-gray-500">
+            {total}{filtersActive ? ' matching' : ''} run{total === 1 ? '' : 's'}
+          </span>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <div className="flex items-center gap-1">
@@ -70,6 +88,24 @@ export default function HistoryTable({ slug }: { slug: string }) {
           </button>
         </div>
       </header>
+
+      <div className="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b bg-gray-50/60">
+        <span className="text-xs uppercase tracking-wider text-gray-400 mr-1">Filter</span>
+        <FilterSelect label="Notified" value={notified} onChange={onFilter(setNotified)} options={[
+          ['all', 'All'], ['yes', '📣 Notified'], ['no', 'Not notified'],
+        ]} />
+        <FilterSelect label="Status" value={status} onChange={onFilter(setStatus)} options={[
+          ['all', 'All statuses'], ['ok', 'OK'], ['error', 'Error'], ['skipped', 'Skipped'],
+        ]} />
+        <FilterSelect label="Trigger" value={trigger} onChange={onFilter(setTrigger)} options={[
+          ['all', 'All triggers'], ['scheduled', 'Scheduled'], ['manual', 'Manual'],
+        ]} />
+        {filtersActive && (
+          <button onClick={resetFilters} className="text-xs text-blue-600 hover:underline ml-1">
+            clear filters
+          </button>
+        )}
+      </div>
 
       {rows.length === 0 ? (
         <div className="px-5 py-12 text-center text-sm text-gray-500">
@@ -187,6 +223,29 @@ function NewCount({ paid, all }: { paid: number; all: number }) {
     <span className="text-green-700 font-semibold">
       {paid}<span className="text-gray-400">/</span>{all}
     </span>
+  );
+}
+
+function FilterSelect<T extends string>({ label, value, onChange, options }: {
+  label: string;
+  value: T;
+  onChange: (v: T) => void;
+  options: [T, string][];
+}) {
+  const active = value !== 'all';
+  return (
+    <label className="flex items-center gap-1.5">
+      <span className="sr-only">{label}</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value as T)}
+        className={`text-xs rounded-md border px-2 py-1 bg-white cursor-pointer transition-colors ${
+          active ? 'border-blue-400 text-blue-700 font-medium' : 'border-gray-300 text-gray-600'
+        }`}
+      >
+        {options.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
+      </select>
+    </label>
   );
 }
 

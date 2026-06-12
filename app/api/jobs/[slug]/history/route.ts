@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, count } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs, runHistory } from '@/lib/db/schema';
 import { requireSession } from '@/lib/api/require-session';
@@ -15,6 +15,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const page     = Math.max(1,  parseInt(url.searchParams.get('page')     ?? '1',  10));
   const pageSize = Math.min(100, Math.max(1, parseInt(url.searchParams.get('pageSize') ?? '25', 10)));
   const detailId = url.searchParams.get('detailId');
+  const notified = url.searchParams.get('notified'); // 'yes' | 'no' | null (=all)
+  const status   = url.searchParams.get('status');   // 'ok' | 'error' | 'skipped' | null (=all)
+  const trigger  = url.searchParams.get('trigger');  // 'scheduled' | 'manual' | null (=all)
 
   if (detailId) {
     const id = Number(detailId);
@@ -24,6 +27,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     if (!row || row.jobId !== job.id) return NextResponse.json({ error: 'not found' }, { status: 404 });
     return NextResponse.json({ detail: row });
   }
+
+  const where = and(
+    eq(runHistory.jobId, job.id),
+    notified === 'yes' ? eq(runHistory.notificationSent, true)
+      : notified === 'no' ? eq(runHistory.notificationSent, false)
+      : undefined,
+    status === 'ok' || status === 'error' || status === 'skipped'
+      ? eq(runHistory.status, status)
+      : undefined,
+    trigger === 'scheduled' || trigger === 'manual'
+      ? eq(runHistory.triggerType, trigger)
+      : undefined,
+  );
 
   const rows = await db.select({
     id: runHistory.id,
@@ -36,16 +52,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     newPaidQualifications: runHistory.newPaidQualifications, newAllQualifications: runHistory.newAllQualifications,
     notificationSent: runHistory.notificationSent,
   })
-    .from(runHistory).where(eq(runHistory.jobId, job.id))
+    .from(runHistory).where(where)
     .orderBy(desc(runHistory.startedAt))
     .limit(pageSize).offset((page - 1) * pageSize);
 
-  const countResult = await db.execute<{ count: number }>(
-    sql`SELECT COUNT(*)::int AS count FROM run_history WHERE job_id = ${job.id}`
-  );
-  const total = (countResult as unknown as { rows?: { count: number }[] }).rows?.[0]?.count
-    ?? (countResult as unknown as { count: number }[])[0]?.count
-    ?? 0;
+  const [{ total }] = await db.select({ total: count() }).from(runHistory).where(where);
 
   return NextResponse.json({ rows, page, pageSize, total });
 }
