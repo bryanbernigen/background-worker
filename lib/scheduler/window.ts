@@ -35,9 +35,16 @@ export function jitter(minS: number, maxS: number): number {
   return Math.floor(Math.random() * (maxS - minS + 1)) + minS;
 }
 
+/** Window opening offset by a fresh jitter, so the first run of the day
+ *  doesn't fire at exactly `dayStartHour:00` — same variability as daytime runs. */
+function jitteredWindowOpening(now: Date, cfg: Window & JitterCfg): Date {
+  const opening = nextWindowOpening(now, cfg);
+  return new Date(opening.getTime() + jitter(cfg.minIntervalS, cfg.maxIntervalS) * 1000);
+}
+
 export function computeNextRunAt(now: Date, cfg: Window & JitterCfg): Date {
-  if (!isWithinWindow(now, cfg)) return nextWindowOpening(now, cfg);
+  if (!isWithinWindow(now, cfg)) return jitteredWindowOpening(now, cfg);
   const raw = new Date(now.getTime() + jitter(cfg.minIntervalS, cfg.maxIntervalS) * 1000);
-  if (!isWithinWindow(raw, cfg)) return nextWindowOpening(raw, cfg);
+  if (!isWithinWindow(raw, cfg)) return jitteredWindowOpening(raw, cfg);
   return raw;
 }

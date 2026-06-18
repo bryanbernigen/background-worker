@@ -54,15 +54,26 @@ describe('computeNextRunAt', () => {
     const out = computeNextRunAt(now, { ...W, minIntervalS: 600, maxIntervalS: 600 });
     expect(out.toISOString()).toBe(wib(2026, 6, 1, 12, 10).toISOString());
   });
-  it('clamps to next window opening when jitter overshoots the window end', () => {
+  it('jitters past the next window opening when jitter overshoots the window end', () => {
     const now = wib(2026, 6, 1, 22, 50);
-    // min=max=1800s (30min) => raw next = 23:20 (outside). Clamp to next day 07:00.
+    // min=max=1800s (30min) => raw next = 23:20 (outside). Clamp to next day 07:00,
+    // then offset by the jitter so it does not fire exactly at the opening hour.
     const out = computeNextRunAt(now, { ...W, minIntervalS: 1800, maxIntervalS: 1800 });
-    expect(out.toISOString()).toBe(wib(2026, 6, 2, 7, 0).toISOString());
+    expect(out.toISOString()).toBe(wib(2026, 6, 2, 7, 30).toISOString());
   });
-  it('clamps to next window opening when called outside the window', () => {
+  it('jitters past the next window opening when called outside the window', () => {
     const now = wib(2026, 6, 1, 3, 0);
-    const out = computeNextRunAt(now, { ...W, minIntervalS: 600, maxIntervalS: 1800 });
-    expect(out.toISOString()).toBe(wib(2026, 6, 1, 7, 0).toISOString());
+    // min=max=600s (10min) => opening 07:00 + 10min = 07:10, not 07:00 sharp.
+    const out = computeNextRunAt(now, { ...W, minIntervalS: 600, maxIntervalS: 600 });
+    expect(out.toISOString()).toBe(wib(2026, 6, 1, 7, 10).toISOString());
+  });
+  it('keeps the jittered window-opening start inside [open+min, open+max]', () => {
+    const now = wib(2026, 6, 1, 3, 0);
+    for (let i = 0; i < 1000; i++) {
+      const out = computeNextRunAt(now, { ...W, minIntervalS: 600, maxIntervalS: 1800 });
+      const offsetS = (out.getTime() - wib(2026, 6, 1, 7, 0).getTime()) / 1000;
+      expect(offsetS).toBeGreaterThanOrEqual(600);
+      expect(offsetS).toBeLessThanOrEqual(1800);
+    }
   });
 });
