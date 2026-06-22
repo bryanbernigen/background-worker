@@ -9,6 +9,8 @@ RUN npm ci
 # --- build stage ---
 FROM node:22-alpine AS build
 WORKDIR /app
+# git lets next.config.ts stamp the commit SHA into the build (.git is in context).
+RUN apk add --no-cache git
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

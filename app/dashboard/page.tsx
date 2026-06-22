@@ -6,6 +6,7 @@ import { verifySessionToken } from '@/lib/auth';
 import { db } from '@/lib/db/client';
 import { jobs, runHistory } from '@/lib/db/schema';
 import { jobRegistry } from '@/lib/jobs/registry';
+import { externalServices, GITHUB_REPO_URL } from '@/lib/services';
 import Card from '@/components/ui/card';
 import Badge from '@/components/ui/badge';
 import Button from '@/components/ui/button';
@@ -52,8 +53,56 @@ export default async function DashboardPage() {
             </Card>
           ))}
         </div>
+
+        <section className="mt-8">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Services &amp; Accounts</h2>
+          <Card className="!p-0 overflow-hidden">
+            <ul className="divide-y">
+              {externalServices.map(svc => (
+                <li key={svc.name}>
+                  <a
+                    href={svc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-gray-50 transition-colors group"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium text-gray-900 flex items-center gap-1.5">
+                        {svc.name}
+                        <span className="text-gray-300 group-hover:text-blue-500 transition-colors" aria-hidden>↗</span>
+                      </div>
+                      {svc.note && <div className="text-sm text-gray-500 truncate">{svc.note}</div>}
+                    </div>
+                    <span className="shrink-0 text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">{svc.account}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+
+        <BuildFooter />
       </div>
     </div>
+  );
+}
+
+/** Subtle footer showing which commit this deploy is running, linked to GitHub. */
+function BuildFooter() {
+  const commit = process.env.GIT_COMMIT;
+  if (!commit || commit === 'unknown') {
+    return <footer className="mt-8 text-center text-xs text-gray-400">Auto Checker</footer>;
+  }
+  return (
+    <footer className="mt-8 text-center text-xs text-gray-400">
+      Auto Checker · running{' '}
+      <a
+        href={`${GITHUB_REPO_URL}/commit/${commit}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-mono text-gray-500 hover:text-blue-600 hover:underline"
+      >{commit}</a>
+    </footer>
   );
 }
 
