@@ -11,6 +11,19 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 1b. Health endpoint — for external uptime monitors. Gated by HEALTH_CHECK_TOKEN
+  // (via ?token= or x-health-secret header), since monitors can't log in. A valid
+  // dashboard session also works. If the token isn't configured, leave it open.
+  if (pathname === '/api/health') {
+    const expected = process.env.HEALTH_CHECK_TOKEN;
+    if (!expected) return NextResponse.next();
+    const provided = req.headers.get('x-health-secret') ?? req.nextUrl.searchParams.get('token');
+    if (provided === expected) return NextResponse.next();
+    const token = req.cookies.get('session')?.value;
+    if (token && await verifySessionToken(token)) return NextResponse.next();
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
   // 2. Cron Endpoints Gate Guard
   if (pathname === '/api/cron/check' || pathname === '/api/cron/tick') {
     const cronSecret = req.headers.get('x-cron-secret');

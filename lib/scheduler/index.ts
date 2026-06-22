@@ -37,6 +37,11 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 function isStarted(): boolean { return globalThis.__schedulerStarted === true; }
 function setStarted(v: boolean): void { globalThis.__schedulerStarted = v; }
 
+/** Liveness snapshot for the health endpoint. */
+export function schedulerStatus(): { started: boolean; armedTimers: number } {
+  return { started: isStarted(), armedTimers: timers.size };
+}
+
 type Trigger = 'scheduled' | 'manual';
 
 export interface ManualRunOutcome {

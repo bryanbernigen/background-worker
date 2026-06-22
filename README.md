@@ -29,6 +29,8 @@ npm run dev
 | `DATABASE_URL` | PostgreSQL connection string | Yes |
 | `WAHA_URL` | WAHA API base URL (e.g. `http://localhost:3001`) | Yes |
 | `WAHA_API_KEY` | WAHA API key | No |
+| `WAHA_SESSION` | WAHA session name (default: `default`) | No |
+| `HEALTH_CHECK_TOKEN` | Token guarding `GET /api/health`; if unset the endpoint is open | No |
 | `JWT_SECRET` | Secret for signing the session JWT (min 32 chars) | Yes |
 | `ENCRYPTION_KEY` | 64 hex chars (32 bytes) — encrypts stored session cookies | Yes |
 | `ADMIN_USERNAME` | Login username (default: `admin`) | No |
@@ -82,6 +84,45 @@ After WAHA is up, open its dashboard, scan the QR code to link WhatsApp, and con
 - **PostgreSQL + Drizzle ORM** — jobs, recipients, run history, and encrypted session cookies; migrations applied automatically on boot
 - **In-process scheduler** (`lib/scheduler`, started from `instrumentation.ts`) — arms a per-job timer at a random interval within each job's daily window; no external cron needed
 - **WAHA** (Docker) — sends the WhatsApp messages
+
+## Monitoring (is it still running?)
+
+The app exposes a health endpoint so you can be alerted when monitoring silently
+stops — including the most common failure, the **WAHA WhatsApp session expiring**
+(the WAHA process keeps running but can no longer send).
+
+**`GET /api/health`** returns JSON and an HTTP status (`200` healthy, `503`
+unhealthy) so any uptime monitor can act on it. It checks:
+
+- **database** — a `SELECT 1` succeeds
+- **scheduler** — the in-process scheduler is started (and how many timers are armed)
+- **waha** — `GET /api/sessions/{WAHA_SESSION}` reports `status: WORKING`; anything
+  else (`SCAN_QR_CODE`, `STOPPED`, `FAILED`) means it **can't send** → `degraded`
+- **cookie** — the DataAnnotation cookie isn't rejected or past its expiry
+- **jobs** — the last successful run isn't stale *while inside the daily window*
+
+```jsonc
+{ "status": "ok", "checks": { "database": {...}, "scheduler": {...},
+  "waha": { "ok": true, "status": "WORKING", "account": "..." }, "jobs": [...] } }
+```
+
+The body contains no secrets (no cookie value, no tokens).
+
+### Wiring it up (do this once)
+
+1. Set `HEALTH_CHECK_TOKEN` to a random value (`openssl rand -hex 16`).
+2. Create a monitor in a free uptime service — **[UptimeRobot](https://uptimerobot.com)**
+   or **[Better Stack](https://betterstack.com/uptime)** — pointed at
+   `https://your-app/api/health?token=YOUR_TOKEN` (or send the token as an
+   `x-health-secret` header), checking every 1–5 minutes.
+3. Configure that monitor to alert you by **email / push / SMS** — a channel
+   independent of the app and of WhatsApp. It will fire when the endpoint is
+   unreachable (app/host down) or returns `503` (WAHA session expired, cookie
+   dead, runs stalled).
+
+This is deliberately *not* a self-sent WhatsApp "I'm alive" message: a dead app
+can't send one, and a broken WhatsApp session can't warn you about itself. An
+external monitor on an independent channel catches those cases.
 
 ## Adding a New Job
 
