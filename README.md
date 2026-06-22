@@ -91,8 +91,9 @@ The app exposes a health endpoint so you can be alerted when monitoring silently
 stops — including the most common failure, the **WAHA WhatsApp session expiring**
 (the WAHA process keeps running but can no longer send).
 
-**`GET /api/health`** returns JSON and an HTTP status (`200` healthy, `503`
-unhealthy) so any uptime monitor can act on it. It checks:
+**`GET /api/health`** (also responds to `HEAD`) returns an HTTP status
+(`200` healthy, `503` unhealthy) so any uptime monitor can act on it — `GET`
+includes a JSON body, `HEAD` is status-only. It checks:
 
 - **database** — a `SELECT 1` succeeds
 - **scheduler** — the in-process scheduler is started (and how many timers are armed)
@@ -113,8 +114,10 @@ The body contains no secrets (no cookie value, no tokens).
 1. Set `HEALTH_CHECK_TOKEN` to a random value (`openssl rand -hex 16`).
 2. Create a monitor in a free uptime service — **[UptimeRobot](https://uptimerobot.com)**
    or **[Better Stack](https://betterstack.com/uptime)** — pointed at
-   `https://your-app/api/health?token=YOUR_TOKEN` (or send the token as an
-   `x-health-secret` header), checking every 1–5 minutes.
+   `https://your-app/api/health?token=YOUR_TOKEN`, checking every 1–5 minutes.
+   - Pass the token as the **`?token=`** query param (works on UptimeRobot free,
+     which probes with `HEAD` and can't set headers) **or** as an
+     `Authorization: Bearer YOUR_TOKEN` header where supported.
 3. Configure that monitor to alert you by **email / push / SMS** — a channel
    independent of the app and of WhatsApp. It will fire when the endpoint is
    unreachable (app/host down) or returns `503` (WAHA session expired, cookie

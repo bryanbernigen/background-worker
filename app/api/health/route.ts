@@ -5,13 +5,13 @@ import { jobs, runHistory } from '@/lib/db/schema';
 import { isWithinWindow } from '@/lib/scheduler/window';
 import { schedulerStatus } from '@/lib/scheduler';
 import { WahaClient } from '@/lib/waha';
-import { computeHealth, healthHttpStatus, type JobHealthInput } from '@/lib/health';
+import { computeHealth, healthHttpStatus, type HealthReport, type JobHealthInput } from '@/lib/health';
 
 // Always evaluated fresh — never cached.
 export const dynamic = 'force-dynamic';
 
-// Access is gated in middleware via HEALTH_CHECK_TOKEN; the body avoids secrets.
-export async function GET() {
+/** Run all checks and produce the report plus the HTTP code to return. */
+async function evaluate(): Promise<{ report: HealthReport & { time: string }; code: number }> {
   const now = Date.now();
 
   // 1. Database
@@ -59,8 +59,17 @@ export async function GET() {
     jobs: jobInputs,
   });
 
-  return NextResponse.json(
-    { ...report, time: new Date(now).toISOString() },
-    { status: healthHttpStatus(report.status) },
-  );
+  return { report: { ...report, time: new Date(now).toISOString() }, code: healthHttpStatus(report.status) };
+}
+
+// Access is gated in middleware via HEALTH_CHECK_TOKEN; the body avoids secrets.
+export async function GET() {
+  const { report, code } = await evaluate();
+  return NextResponse.json(report, { status: code });
+}
+
+// UptimeRobot's free tier probes with HEAD — return the same status, no body.
+export async function HEAD() {
+  const { code } = await evaluate();
+  return new NextResponse(null, { status: code });
 }
