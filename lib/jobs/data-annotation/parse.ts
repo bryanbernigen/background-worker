@@ -31,6 +31,23 @@ export function parseDataAnnotation(html: string): DataAnnotationProps | null {
   }
 }
 
+/**
+ * Reads the real session expiry the site embeds in the page. DataAnnotation
+ * renders a `SessionExpirationBanner-hybrid-root` element whose data-props JSON
+ * carries `sessionExpiresAt` as an epoch-ms integer. The pasted Cookie header
+ * has no expiry of its own, so this scraped value is our source of truth.
+ *
+ * Returns epoch milliseconds, or null if the field is absent/unparseable.
+ */
+export function extractSessionExpiry(html: string): number | null {
+  // The value sits inside HTML-escaped JSON (`&quot;sessionExpiresAt&quot;:123`),
+  // but match the unescaped form too in case the markup changes.
+  const m = html.match(/sessionExpiresAt(?:&quot;|")\s*:\s*(\d+)/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 function hasTasks(s: string): boolean {
   return parseInt(s.replace(/\D/g, '') || '0', 10) > 0;
 }

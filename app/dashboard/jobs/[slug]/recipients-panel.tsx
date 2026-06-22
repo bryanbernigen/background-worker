@@ -3,25 +3,32 @@ import { useEffect, useState } from 'react';
 
 interface Recipient { id: number; name: string; phone: string }
 
-export default function RecipientsPanel({ slug }: { slug: string }) {
+interface Props {
+  slug: string;
+  /** Which recipient list this panel manages. Defaults to project alerts. */
+  kind?: 'project' | 'cookie';
+  title?: string;
+}
+
+export default function RecipientsPanel({ slug, kind = 'project', title = 'WhatsApp recipients' }: Props) {
   const [rows, setRows] = useState<Recipient[]>([]);
   const [name, setName] = useState(''); const [phone, setPhone] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [dirty, setDirty] = useState<Record<number, boolean>>({});
 
   const load = async () => {
-    const res = await fetch(`/api/jobs/${slug}/recipients`);
+    const res = await fetch(`/api/jobs/${slug}/recipients?kind=${kind}`);
     const body = await res.json();
     setRows(body.recipients ?? []);
     setDirty({});
   };
-  useEffect(() => { void load(); }, [slug]);
+  useEffect(() => { void load(); }, [slug, kind]);
 
   const add = async () => {
     if (!name || !phone) return;
     const res = await fetch(`/api/jobs/${slug}/recipients`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, phone }),
+      body: JSON.stringify({ name, phone, kind }),
     });
     if (res.ok) { setName(''); setPhone(''); setMsg('Added'); void load(); }
     else setMsg(`Add failed: ${res.status}`);
@@ -51,7 +58,7 @@ export default function RecipientsPanel({ slug }: { slug: string }) {
   return (
     <div className="border rounded-lg bg-white shadow-sm">
       <header className="flex items-center justify-between px-4 py-3 border-b">
-        <h3 className="font-semibold">WhatsApp recipients</h3>
+        <h3 className="font-semibold">{title}</h3>
         <span className="text-sm text-gray-500">{rows.length} configured</span>
       </header>
 

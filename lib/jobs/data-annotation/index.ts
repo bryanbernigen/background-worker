@@ -1,16 +1,30 @@
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { fetchDataAnnotationPage } from './fetch';
-import { parseDataAnnotation, extractPaidItems } from './parse';
+import { parseDataAnnotation, extractPaidItems, extractSessionExpiry } from './parse';
 import { formatNotification } from './format';
 import { diffNewItems } from './diff';
 import { decrypt } from '@/lib/crypto';
 import { WahaClient } from '@/lib/waha';
+import { jobs } from '@/lib/db/schema';
 import type { JobModule, RunContext, RunResult } from '../types';
 import CustomSettingsPanel from './settings-panel';
 
 export const customSettingsSchema = z.object({
-  cookie_encrypted: z.string().optional(),
+  cookie_encrypted:  z.string().optional(),
+  cookie_expires_at: z.number().optional(),  // epoch ms, read from the site
+  cookie_checked_at: z.number().optional(),  // epoch ms, when expiry was last read
+  cookie_warned:     z.boolean().optional(), // 24h warning already sent for this cookie
+  cookie_invalid:    z.boolean().optional(), // last fetch was rejected (auth)
 });
+
+/** Merge a patch into the job's custom_settings without clobbering other keys. */
+async function persistCookieState(ctx: RunContext, patch: Record<string, unknown>): Promise<void> {
+  const base = (ctx.custom ?? {}) as Record<string, unknown>;
+  await ctx.db.update(jobs)
+    .set({ customSettings: { ...base, ...patch }, updatedAt: new Date() })
+    .where(eq(jobs.id, ctx.jobId));
+}
 
 export const dataAnnotation: JobModule = {
   slug: 'data-annotation',
@@ -36,6 +50,7 @@ export const dataAnnotation: JobModule = {
     catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes('401') || msg.includes('403')) {
+        await persistCookieState(ctx, { cookie_invalid: true });
         return mkError('Auth expired — please update cookie');
       }
       return mkError(`Fetch failed: ${msg}`);
@@ -43,6 +58,14 @@ export const dataAnnotation: JobModule = {
 
     const props = parseDataAnnotation(html);
     if (!props) return mkError(`Failed to parse response (HTML length: ${html.length})`, html);
+
+    // Capture the real session expiry the site embeds in the page. Only
+    // overwrite the stored value when we actually found one, so a parse miss
+    // doesn't wipe a previously-known expiry.
+    const expiresAt = extractSessionExpiry(html);
+    const cookieState: Record<string, unknown> = { cookie_checked_at: Date.now(), cookie_invalid: false };
+    if (expiresAt) cookieState.cookie_expires_at = expiresAt;
+    await persistCookieState(ctx, cookieState);
 
     const items = extractPaidItems(props);
     const newItems = diffNewItems(items, ctx.lastSuccessfulItems);

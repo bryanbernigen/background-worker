@@ -1,0 +1,1 @@
+ALTER TABLE "recipients" ADD COLUMN "kind" text DEFAULT 'project' NOT NULL;

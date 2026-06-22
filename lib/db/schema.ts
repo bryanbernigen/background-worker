@@ -29,6 +29,8 @@ export const recipients = pgTable(
     jobId:     integer('job_id').notNull().references(() => jobs.id, { onDelete: 'cascade' }),
     name:      text('name').notNull(),
     phone:     text('phone').notNull(),
+    // 'project' = new-task alerts; 'cookie' = cookie-expiry warnings.
+    kind:      text('kind').notNull().default('project'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   t => ({ jobIdx: index('recipients_job_id_idx').on(t.jobId) }),

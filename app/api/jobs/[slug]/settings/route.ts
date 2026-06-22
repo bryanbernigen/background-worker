@@ -6,7 +6,7 @@ import { jobs } from '@/lib/db/schema';
 import { requireSession } from '@/lib/api/require-session';
 import { encrypt } from '@/lib/crypto';
 import { getJob } from '@/lib/jobs/registry';
-import { reschedule } from '@/lib/scheduler';
+import { reschedule, runManual } from '@/lib/scheduler';
 
 const metaSchema = z.object({
   title:       z.string().min(1).optional(),
@@ -52,7 +52,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
     const incoming: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(body.custom)) {
       if (k === 'cookie' && typeof v === 'string') {
-        incoming.cookie_encrypted = encrypt(v);
+        // New cookie: store it and clear all derived expiry state. The
+        // immediate validation run below repopulates expires_at/checked_at.
+        incoming.cookie_encrypted  = encrypt(v);
+        incoming.cookie_warned     = false;
+        incoming.cookie_invalid    = false;
+        incoming.cookie_expires_at = null;
+        incoming.cookie_checked_at = null;
       } else {
         incoming[k] = v;
       }
@@ -79,6 +85,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
     customSettings: newCustom,
     updatedAt: new Date(),
   }).where(eq(jobs.id, job.id));
+
+  // When a new cookie was provided, immediately validate it: this confirms the
+  // cookie works and captures the real session expiry right away (it also
+  // re-arms the expiry-warning timer via runManual → armExpiryTimer).
+  const cookieProvided = typeof body.custom?.cookie === 'string';
+  if (cookieProvided) {
+    try { await runManual(job.id); }
+    catch (e) { console.error('[settings] cookie validation run failed', e); }
+  }
 
   await reschedule(job.id);
 

@@ -1,31 +1,53 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { formatDurationS } from '@/lib/format-duration';
 
 interface Props { jobId: number; current: unknown }
 
+interface CookieState {
+  preview?: string;
+  expiresAt?: number;
+  checkedAt?: number;
+  invalid?: boolean;
+}
+
+function readState(current: unknown): CookieState {
+  const c = (current ?? {}) as Record<string, unknown>;
+  return {
+    preview:   typeof c.cookie_preview    === 'string'  ? c.cookie_preview    : undefined,
+    expiresAt: typeof c.cookie_expires_at === 'number'  ? c.cookie_expires_at : undefined,
+    checkedAt: typeof c.cookie_checked_at === 'number'  ? c.cookie_checked_at : undefined,
+    invalid:   c.cookie_invalid === true,
+  };
+}
+
 export default function DASettingsPanel({ current }: Props) {
-  const c = (current ?? {}) as { cookie_preview?: string };
-  const [stored, setStored] = useState<string | undefined>(c.cookie_preview);
+  const [state, setState] = useState<CookieState>(() => readState(current));
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState<string | null>(null);
 
-  // Refresh stored preview after saves so the front/back display updates without page reload.
+  // Pull the latest cookie state from the server.
   const refresh = async () => {
     try {
       const res = await fetch(`/api/jobs/data-annotation`, { cache: 'no-store' });
       if (!res.ok) return;
       const body = await res.json();
-      const preview = body?.job?.custom?.cookie_preview;
-      setStored(typeof preview === 'string' ? preview : undefined);
+      setState(readState(body?.job?.custom));
     } catch { /* swallow */ }
   };
 
-  useEffect(() => { setStored(c.cookie_preview); }, [c.cookie_preview]);
+  useEffect(() => { setState(readState(current)); }, [current]);
+
+  // Poll so the expiry/countdown reflect background runs without a reload.
+  useEffect(() => {
+    const t = setInterval(() => { void refresh(); }, 5000);
+    return () => clearInterval(t);
+  }, []);
 
   const save = async () => {
     if (!value) return;
-    setBusy(true); setMsg(null);
+    setBusy(true); setMsg('Saving & validating…');
     const res = await fetch(`/api/jobs/data-annotation/settings`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
@@ -41,23 +63,27 @@ export default function DASettingsPanel({ current }: Props) {
     }
   };
 
+  const { preview, expiresAt, checkedAt, invalid } = state;
+
   return (
     <div className="space-y-3 border rounded p-4 bg-white">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">DataAnnotation cookie</h3>
-        {stored && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">stored</span>}
+        {preview && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">stored</span>}
       </div>
 
-      {stored ? (
-        <StoredCookieView preview={stored} />
+      {preview ? (
+        <StoredCookieView preview={preview} />
       ) : (
         <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
           No cookie configured yet. Paste your session cookie below to enable scraping.
         </div>
       )}
 
+      {preview && <CookieExpiry expiresAt={expiresAt} checkedAt={checkedAt} invalid={invalid} />}
+
       <label className="block">
-        <span className="text-sm text-gray-600">{stored ? 'Replace with new cookie' : 'Paste session cookie'}</span>
+        <span className="text-sm text-gray-600">{preview ? 'Replace with new cookie' : 'Paste session cookie'}</span>
         <textarea
           className="w-full border rounded p-2 text-sm font-mono mt-1"
           rows={3}
@@ -71,11 +97,82 @@ export default function DASettingsPanel({ current }: Props) {
           disabled={busy || !value}
           onClick={save}
           className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
-        >{stored ? 'Update cookie' : 'Save cookie'}</button>
+        >{preview ? 'Update cookie' : 'Save cookie'}</button>
         {msg && <span className="text-sm text-gray-600">{msg}</span>}
       </div>
     </div>
   );
+}
+
+/**
+ * Shows the real session expiry (read from the scraped page) plus a live
+ * countdown. The countdown ticks every second; the underlying expiry is
+ * refreshed by the panel's poll. Goes amber under 24h, red once expired.
+ */
+function CookieExpiry({ expiresAt, checkedAt, invalid }: { expiresAt?: number; checkedAt?: number; invalid?: boolean }) {
+  // Starts null so server and first client render match (no hydration mismatch).
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (invalid) {
+    return (
+      <div className="text-sm rounded p-2 bg-red-50 border border-red-200 text-red-800">
+        ⛔ Cookie was rejected by DataAnnotation — paste a fresh one.
+      </div>
+    );
+  }
+
+  if (!expiresAt) {
+    return (
+      <div className="text-sm rounded p-2 bg-gray-50 border text-gray-500">
+        No expiry detected yet — will populate on the next check.
+      </div>
+    );
+  }
+
+  const remainingS = now !== null ? (expiresAt - now) / 1000 : null;
+  const expired = remainingS !== null && remainingS <= 0;
+  const under24h = remainingS !== null && remainingS > 0 && remainingS <= 24 * 3600;
+
+  const tone = expired
+    ? 'bg-red-50 border-red-200 text-red-800'
+    : under24h
+      ? 'bg-amber-50 border-amber-200 text-amber-800'
+      : 'bg-emerald-50 border-emerald-200 text-emerald-800';
+
+  return (
+    <div className={`text-sm rounded p-2 border ${tone}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span>
+          {remainingS === null ? (
+            'Calculating…'
+          ) : expired ? (
+            <>⛔ Cookie <strong>expired</strong> {formatDurationS(-remainingS)} ago</>
+          ) : (
+            <>🔑 Cookie expires in <strong>{formatDurationS(remainingS)}</strong></>
+          )}
+        </span>
+        <span className="text-xs opacity-80">{formatExpiryClock(expiresAt)}</span>
+      </div>
+      {checkedAt && (
+        <div className="text-xs opacity-70 mt-0.5">
+          checked {now !== null ? `${formatDurationS((now - checkedAt) / 1000)} ago` : '—'}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Absolute expiry in the viewer's local time, e.g. "Jun 25, 12:50 PM". */
+function formatExpiryClock(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
 }
 
 /** Splits the preview string like "abcd…wxyz (50 chars)" into front + back parts for prominent display. */

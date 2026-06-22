@@ -16,11 +16,23 @@ declare global {
   // eslint-disable-next-line no-var
   var __schedulerTimers: Map<number, NodeJS.Timeout> | undefined;
   // eslint-disable-next-line no-var
+  var __expiryTimers: Map<number, NodeJS.Timeout> | undefined;
+  // eslint-disable-next-line no-var
   var __schedulerStarted: boolean | undefined;
 }
 
 const timers: Map<number, NodeJS.Timeout> =
   globalThis.__schedulerTimers ?? (globalThis.__schedulerTimers = new Map());
+
+// Separate timers that fire the "cookie expires in ~24h" warning, armed
+// independently of the scrape timers (and of job.enabled).
+const expiryTimers: Map<number, NodeJS.Timeout> =
+  globalThis.__expiryTimers ?? (globalThis.__expiryTimers = new Map());
+
+/** How far ahead of expiry to send the warning. */
+const EXPIRY_WARN_LEAD_MS = 24 * 60 * 60 * 1000;
+/** setTimeout caps at ~24.8 days; clamp longer waits and re-arm later. */
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 function isStarted(): boolean { return globalThis.__schedulerStarted === true; }
 function setStarted(v: boolean): void { globalThis.__schedulerStarted = v; }
@@ -36,18 +48,24 @@ export interface ManualRunOutcome {
 export async function start(): Promise<void> {
   if (isStarted()) return;
   setStarted(true);
-  const all = await db.select().from(jobs).where(eq(jobs.enabled, true));
-  for (const job of all) await armTimer(job.id);
+  const enabled = await db.select().from(jobs).where(eq(jobs.enabled, true));
+  for (const job of enabled) await armTimer(job.id);
+  // Expiry warnings are armed for ALL jobs, regardless of enabled — you still
+  // want to be told the cookie is about to die even if scraping is paused.
+  const all = await db.select({ id: jobs.id }).from(jobs);
+  for (const job of all) await armExpiryTimer(job.id);
   process.on('unhandledRejection', err => {
     console.error('[scheduler] unhandledRejection', err);
   });
-  console.log(`[scheduler] started — ${all.length} job(s) armed`);
+  console.log(`[scheduler] started — ${enabled.length} job(s) armed`);
 }
 
 /** Stop all timers (for tests / shutdown). */
 export function stop(): void {
   for (const t of timers.values()) clearTimeout(t);
   timers.clear();
+  for (const t of expiryTimers.values()) clearTimeout(t);
+  expiryTimers.clear();
   setStarted(false);
 }
 
@@ -56,11 +74,14 @@ export async function reschedule(jobId: number): Promise<void> {
   const existing = timers.get(jobId);
   if (existing) { clearTimeout(existing); timers.delete(jobId); }
   await armTimer(jobId);
+  await armExpiryTimer(jobId);
 }
 
 /** Manual run (HTTP-triggered). Returns lock_busy if a scheduled run is in flight. */
 export async function runManual(jobId: number): Promise<ManualRunOutcome> {
   const r = await executeRun(jobId, 'manual');
+  // A run may have refreshed the cookie expiry — re-arm the warning timer.
+  await armExpiryTimer(jobId);
   if (r.kind === 'lock_busy') return { status: 'lock_busy' };
   return { status: 'ran', result: r.kind === 'ran' ? r.result : undefined };
 }
@@ -96,9 +117,97 @@ async function armTimer(jobId: number): Promise<void> {
   timers.set(jobId, t);
 }
 
+// ---------- cookie-expiry warning ----------
+
+/**
+ * Arm (or clear) the one-shot "cookie expires in ~24h" warning for a job.
+ * Reads the expiry the scraper stored in custom_settings. Fires once per cookie
+ * (cleared by `cookie_warned`, which the settings route resets on a new cookie).
+ */
+export async function armExpiryTimer(jobId: number): Promise<void> {
+  const prev = expiryTimers.get(jobId);
+  if (prev) { clearTimeout(prev); expiryTimers.delete(jobId); }
+
+  const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+  if (!job) return;
+  const custom = (job.customSettings ?? {}) as Record<string, unknown>;
+  const expiresAt = typeof custom.cookie_expires_at === 'number' ? custom.cookie_expires_at : null;
+  if (!expiresAt || custom.cookie_warned === true) return;
+
+  const delay = expiresAt - EXPIRY_WARN_LEAD_MS - Date.now();
+  if (delay <= 0) {
+    // Warn window already reached (e.g. caught up on boot) — fire now.
+    await fireExpiryWarning(jobId);
+    return;
+  }
+  const t = setTimeout(() => { void fireExpiryWarning(jobId); }, Math.min(delay, MAX_TIMEOUT_MS));
+  expiryTimers.set(jobId, t);
+}
+
+async function fireExpiryWarning(jobId: number): Promise<void> {
+  expiryTimers.delete(jobId);
+  try {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
+    if (!job) return;
+    const custom = (job.customSettings ?? {}) as Record<string, unknown>;
+    if (custom.cookie_warned === true) return;
+    const expiresAt = typeof custom.cookie_expires_at === 'number' ? custom.cookie_expires_at : null;
+    if (!expiresAt) return;
+
+    // The clamp above can wake us before the real warn time — re-arm and wait.
+    const delay = expiresAt - EXPIRY_WARN_LEAD_MS - Date.now();
+    if (delay > 0) {
+      const t = setTimeout(() => { void fireExpiryWarning(jobId); }, Math.min(delay, MAX_TIMEOUT_MS));
+      expiryTimers.set(jobId, t);
+      return;
+    }
+
+    const recps = await db.select().from(recipients)
+      .where(and(eq(recipients.jobId, jobId), eq(recipients.kind, 'cookie')));
+    const wahaUrl = process.env.WAHA_URL;
+    if (wahaUrl && recps.length) {
+      const waha = new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '');
+      const msg = formatExpiryWarning(job, expiresAt);
+      let anySent = false;
+      for (const r of recps) {
+        try { anySent = (await waha.sendText(r.phone, msg)) || anySent; }
+        catch (e) { console.error(`[scheduler] cookie-expiry send failed for ${r.phone}`, e); }
+      }
+      // If every send failed, leave cookie_warned unset so a later arm retries.
+      if (!anySent) return;
+    }
+
+    await db.update(jobs)
+      .set({ customSettings: { ...custom, cookie_warned: true }, updatedAt: new Date() })
+      .where(eq(jobs.id, jobId));
+  } catch (err) {
+    console.error(`[scheduler] fireExpiryWarning failed for job ${jobId}`, err);
+  }
+}
+
+function formatExpiryWarning(job: Job, expiresAt: number): string {
+  return (
+    `⚠️ *Cookie Expiring* ⚠️\n\n` +
+    `${job.title} session cookie expires in ~24h (${formatInTz(expiresAt, job.tzOffsetH)}).\n\n` +
+    `_Log in and paste a fresh cookie from the dashboard to keep monitoring running._`
+  );
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+/** "Jun 25, 2026 12:50 (UTC+7)" — formatted at the job's configured offset. */
+function formatInTz(ms: number, tzOffsetH: number): string {
+  const d = new Date(ms + tzOffsetH * 3_600_000);
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  const sign = tzOffsetH >= 0 ? '+' : '-';
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()} ${hh}:${mm} (UTC${sign}${Math.abs(tzOffsetH)})`;
+}
+
 async function onTimerFire(jobId: number): Promise<void> {
   try {
     await executeRun(jobId, 'scheduled');
+    // A successful run may have refreshed the cookie expiry — re-arm the warning.
+    await armExpiryTimer(jobId);
   } catch (err) {
     console.error(`[scheduler] timer fire failed for job ${jobId}`, err);
   } finally {

@@ -69,7 +69,8 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
           dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
         }} />
         {Panel && <Panel jobId={job.id} current={customForPanel} />}
-        <RecipientsPanel slug={slug} />
+        <RecipientsPanel slug={slug} kind="project" title="WhatsApp recipients (new-task alerts)" />
+        <RecipientsPanel slug={slug} kind="cookie" title="Cookie-expiry alert recipients" />
         <HistoryTable slug={slug} />
       </div>
     </div>
