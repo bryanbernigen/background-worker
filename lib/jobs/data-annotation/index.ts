@@ -12,8 +12,9 @@ import CustomSettingsPanel from './settings-panel';
 
 export const customSettingsSchema = z.object({
   cookie_encrypted:  z.string().optional(),
-  cookie_expires_at: z.number().optional(),  // epoch ms, read from the site
-  cookie_checked_at: z.number().optional(),  // epoch ms, when expiry was last read
+  // nullable: cleared to null on a fresh cookie save, then repopulated by the validation run.
+  cookie_expires_at: z.number().nullable().optional(),  // epoch ms, read from the site
+  cookie_checked_at: z.number().nullable().optional(),  // epoch ms, when expiry was last read
   cookie_warned:     z.boolean().optional(), // 24h warning already sent for this cookie
   cookie_invalid:    z.boolean().optional(), // last fetch was rejected (auth)
 });

@@ -58,8 +58,11 @@ export default function DASettingsPanel({ current }: Props) {
       setMsg('Cookie updated');
       setValue('');
       await refresh();
+    } else if (res.status === 401) {
+      setMsg('Session expired — redirecting to login…');
+      setTimeout(() => { window.location.href = '/'; }, 1200);
     } else {
-      setMsg(`Error: ${res.status}`);
+      setMsg(`Couldn't update cookie: ${await readError(res)}`);
     }
   };
 
@@ -165,6 +168,20 @@ function CookieExpiry({ expiresAt, checkedAt, invalid }: { expiresAt?: number; c
       )}
     </div>
   );
+}
+
+/** Turn an error response into a human-readable message. */
+async function readError(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    if (typeof body?.error === 'string') return body.error;
+    // Zod issues come back as an array — name the offending fields.
+    if (Array.isArray(body?.error)) {
+      const fields = body.error.map((i: { path?: (string | number)[] }) => i.path?.join('.')).filter(Boolean);
+      return fields.length ? `invalid fields: ${[...new Set(fields)].join(', ')}` : `request rejected (HTTP ${res.status})`;
+    }
+  } catch { /* non-JSON body */ }
+  return `HTTP ${res.status}`;
 }
 
 /** Absolute expiry in the viewer's local time, e.g. "Jun 25, 12:50 PM". */
