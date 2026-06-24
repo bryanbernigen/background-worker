@@ -63,6 +63,11 @@ export async function middleware(req: NextRequest) {
   const session = token ? await verifySessionToken(token) : null;
 
   if (!session) {
+    // API requests get a clean 401 — redirecting a PATCH/POST to "/" (a GET-only
+    // page) would surface as a confusing 405. Page navigations still redirect.
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
     return NextResponse.redirect(new URL('/', req.url));
   }
 
