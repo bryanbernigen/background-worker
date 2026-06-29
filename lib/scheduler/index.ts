@@ -264,7 +264,11 @@ async function executeRun(jobId: number, trigger: Trigger): Promise<ExecOutcome>
       return { kind: 'ran', result: errorResult(`No JobModule for ${job.slug}`) };
     }
 
-    const recps = await db.select().from(recipients).where(eq(recipients.jobId, jobId));
+    // Only 'project' recipients get new-task alerts. Cookie-expiry warnings go
+    // to 'cookie' recipients via fireExpiryWarning — selecting all kinds here
+    // would double-message anyone listed in both panels.
+    const recps = await db.select().from(recipients)
+      .where(and(eq(recipients.jobId, jobId), eq(recipients.kind, 'project')));
     const lastSuccess = await loadLastSuccessfulItems(jobId);
     const startedAt = new Date();
     let result: RunResult;

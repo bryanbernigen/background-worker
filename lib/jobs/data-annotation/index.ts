@@ -81,9 +81,9 @@ export const dataAnnotation: JobModule = {
     const newPaidProjects = newItems.filter(i => !i.qualification && isPaidStr(i.pay)).length;
     const newPaidQuals    = newItems.filter(i =>  i.qualification && isPaidStr(i.pay)).length;
 
-    // Notification trigger (spec §2 Goals): new_paid_projects > 0 OR new_all_qualifications > 0.
+    // Notification trigger: any new project (paid or not) OR any new qualification (paid or not).
     let notificationSent = false;
-    if (newPaidProjects > 0 || newAllQuals > 0) {
+    if (newItems.length > 0) {
       const wahaUrl = process.env.WAHA_URL;
       if (wahaUrl && ctx.recipients.length) {
         const waha = new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '');
