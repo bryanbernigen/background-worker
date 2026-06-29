@@ -2,7 +2,8 @@ import { eq, desc, and } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs, recipients, runHistory, type Job } from '@/lib/db/schema';
 import { getJob } from '@/lib/jobs/registry';
-import type { PaidItem, RunResult } from '@/lib/jobs/types';
+import type { RunResult } from '@/lib/jobs/types';
+import { buildNotifier, wahaChannelFromEnv } from '@/lib/notify';
 import { computeNextRunAt, isWithinWindow } from './window';
 import { withJobLock } from './lock';
 import { WahaClient } from '@/lib/waha';
@@ -168,7 +169,7 @@ async function fireExpiryWarning(jobId: number): Promise<void> {
     }
 
     const recps = await db.select().from(recipients)
-      .where(and(eq(recipients.jobId, jobId), eq(recipients.kind, 'cookie')));
+      .where(and(eq(recipients.jobId, jobId), eq(recipients.tag, 'cookie-expiry')));
     const wahaUrl = process.env.WAHA_URL;
     if (wahaUrl && recps.length) {
       const waha = new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '');
@@ -247,39 +248,43 @@ async function executeRun(jobId: number, trigger: Trigger): Promise<ExecOutcome>
       await db.insert(runHistory).values({
         jobId, startedAt, finishedAt: startedAt,
         status: 'skipped', triggerType: trigger, skipReason: 'outside_window',
+        summary: 'skipped: outside window',
         diffMs: await diffSincePrevRun(jobId, startedAt),
       });
       return { kind: 'skipped', reason: 'outside_window' as const };
     }
 
-    const mod = getJob(job.slug);
+    const mod = getJob(job.type);
     if (!mod) {
       const startedAt = new Date();
       await db.insert(runHistory).values({
         jobId, startedAt, finishedAt: startedAt,
         status: 'error', triggerType: trigger,
-        errorMessage: `No JobModule registered for slug '${job.slug}'`,
+        errorMessage: `No JobModule registered for type '${job.type}'`,
+        summary: `No JobModule for ${job.type}`,
         diffMs: await diffSincePrevRun(jobId, startedAt),
       });
-      return { kind: 'ran', result: errorResult(`No JobModule for ${job.slug}`) };
+      return { kind: 'ran', result: errorResult(`No JobModule for ${job.type}`) };
     }
 
-    // Only 'project' recipients get new-task alerts. Cookie-expiry warnings go
-    // to 'cookie' recipients via fireExpiryWarning — selecting all kinds here
-    // would double-message anyone listed in both panels.
-    const recps = await db.select().from(recipients)
-      .where(and(eq(recipients.jobId, jobId), eq(recipients.kind, 'project')));
-    const lastSuccess = await loadLastSuccessfulItems(jobId);
+    // Pass ALL recipients with their tags; the job filters via ctx.notify({ tag }).
+    const recps = await db.select().from(recipients).where(eq(recipients.jobId, jobId));
+    const notify = buildNotifier(
+      recps.map(r => ({ id: r.id, name: r.name, phone: r.phone, tag: r.tag })),
+      wahaChannelFromEnv(),
+    );
+    const lastSuccessful = await loadLastSuccessful(jobId);
     const startedAt = new Date();
     let result: RunResult;
     try {
-      result = await mod.runCheck({
+      result = await mod.run({
         jobId,
         meta: { title: job.title, url: job.url, description: job.description },
         custom: job.customSettings,
         db,
-        recipients: recps.map(r => ({ id: r.id, name: r.name, phone: r.phone })),
-        lastSuccessfulItems: lastSuccess,
+        recipients: recps.map(r => ({ id: r.id, name: r.name, phone: r.phone, tag: r.tag })),
+        lastSuccessful,
+        notify,
       });
     } catch (err) {
       result = errorResult(err instanceof Error ? err.message : String(err));
@@ -289,11 +294,8 @@ async function executeRun(jobId: number, trigger: Trigger): Promise<ExecOutcome>
       jobId, startedAt, finishedAt,
       status: result.status, triggerType: trigger,
       diffMs: await diffSincePrevRun(jobId, startedAt),
-      paidProjects: result.paidProjects, allProjects: result.allProjects,
-      paidQualifications: result.paidQualifications, allQualifications: result.allQualifications,
-      newPaidProjects: result.newPaidProjects, newAllProjects: result.newAllProjects,
-      newPaidQualifications: result.newPaidQualifications, newAllQualifications: result.newAllQualifications,
-      extractedItems: result.status === 'ok' ? result.extractedItems : null,
+      summary: result.summary,
+      data: result.status === 'ok' ? (result.data ?? null) : null,
       rawHtml: result.status === 'error' ? result.rawHtml ?? null : null,
       errorMessage: result.errorMessage ?? null,
       notificationSent: result.notificationSent,
@@ -310,6 +312,7 @@ async function executeRun(jobId: number, trigger: Trigger): Promise<ExecOutcome>
       await db.insert(runHistory).values({
         jobId, startedAt: t, finishedAt: t,
         status: 'skipped', triggerType: trigger, skipReason: 'lock_busy',
+        summary: 'skipped: lock busy',
         diffMs: await diffSincePrevRun(jobId, t),
       });
     }
@@ -335,12 +338,12 @@ async function diffSincePrevRun(jobId: number, now: Date): Promise<number | null
   return prev ? now.getTime() - prev.startedAt.getTime() : null;
 }
 
-async function loadLastSuccessfulItems(jobId: number): Promise<PaidItem[]> {
-  const [row] = await db.select({ extractedItems: runHistory.extractedItems })
+async function loadLastSuccessful(jobId: number): Promise<unknown> {
+  const [row] = await db.select({ data: runHistory.data })
     .from(runHistory)
     .where(and(eq(runHistory.jobId, jobId), eq(runHistory.status, 'ok')))
     .orderBy(desc(runHistory.startedAt)).limit(1);
-  return (row?.extractedItems as PaidItem[] | null) ?? [];
+  return row?.data ?? null;
 }
 
 async function maybeAlertFailureStreak(jobId: number, latestError: string): Promise<void> {
@@ -371,14 +374,7 @@ async function maybeAlertFailureStreak(jobId: number, latestError: string): Prom
 }
 
 function errorResult(message: string): RunResult {
-  return {
-    status: 'error',
-    paidProjects: 0, allProjects: 0,
-    paidQualifications: 0, allQualifications: 0,
-    newPaidProjects: 0, newAllProjects: 0,
-    newPaidQualifications: 0, newAllQualifications: 0,
-    extractedItems: [], errorMessage: message, notificationSent: false,
-  };
+  return { status: 'error', summary: message, errorMessage: message, notificationSent: false };
 }
 
 export type { RunResult } from '@/lib/jobs/types';
