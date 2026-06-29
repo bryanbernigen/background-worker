@@ -15,6 +15,13 @@
       "when": 1781857173080,
       "tag": "0001_add_recipient_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782739200000,
+      "tag": "0002_generalize_job_model",
+      "breakpoints": true
     }
   ]
 }
