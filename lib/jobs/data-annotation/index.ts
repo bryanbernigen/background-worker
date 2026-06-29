@@ -3,23 +3,21 @@ import { eq } from 'drizzle-orm';
 import { fetchDataAnnotationPage } from './fetch';
 import { parseDataAnnotation, extractPaidItems, extractSessionExpiry } from './parse';
 import { formatNotification } from './format';
-import { diffNewItems } from './diff';
+import { diffNewItems } from '@/lib/jobs/shared/diff';
 import { decrypt } from '@/lib/crypto';
-import { WahaClient } from '@/lib/waha';
 import { jobs } from '@/lib/db/schema';
 import type { JobModule, RunContext, RunResult } from '../types';
+import type { PaidItem } from './types';
 import CustomSettingsPanel from './settings-panel';
 
 export const customSettingsSchema = z.object({
   cookie_encrypted:  z.string().optional(),
-  // nullable: cleared to null on a fresh cookie save, then repopulated by the validation run.
-  cookie_expires_at: z.number().nullable().optional(),  // epoch ms, read from the site
-  cookie_checked_at: z.number().nullable().optional(),  // epoch ms, when expiry was last read
-  cookie_warned:     z.boolean().optional(), // 24h warning already sent for this cookie
-  cookie_invalid:    z.boolean().optional(), // last fetch was rejected (auth)
+  cookie_expires_at: z.number().nullable().optional(),
+  cookie_checked_at: z.number().nullable().optional(),
+  cookie_warned:     z.boolean().optional(),
+  cookie_invalid:    z.boolean().optional(),
 });
 
-/** Merge a patch into the job's custom_settings without clobbering other keys. */
 async function persistCookieState(ctx: RunContext, patch: Record<string, unknown>): Promise<void> {
   const base = (ctx.custom ?? {}) as Record<string, unknown>;
   await ctx.db.update(jobs)
@@ -27,8 +25,16 @@ async function persistCookieState(ctx: RunContext, patch: Record<string, unknown
     .where(eq(jobs.id, ctx.jobId));
 }
 
+interface DaData {
+  paidProjects: number;          allProjects: number;
+  paidQualifications: number;    allQualifications: number;
+  newPaidProjects: number;       newAllProjects: number;
+  newPaidQualifications: number; newAllQualifications: number;
+  items: PaidItem[];
+}
+
 export const dataAnnotation: JobModule = {
-  slug: 'data-annotation',
+  type: 'data-annotation',
   defaultMeta: {
     title: 'Data Annotation',
     url: 'https://app.dataannotation.tech/workers/projects',
@@ -37,7 +43,7 @@ export const dataAnnotation: JobModule = {
   customSettingsSchema,
   CustomSettingsPanel,
 
-  async runCheck(ctx: RunContext): Promise<RunResult> {
+  async run(ctx: RunContext): Promise<RunResult> {
     const custom = customSettingsSchema.parse(ctx.custom ?? {});
     if (!custom.cookie_encrypted) {
       return mkError('No cookie configured — open settings and paste your session cookie.');
@@ -60,62 +66,42 @@ export const dataAnnotation: JobModule = {
     const props = parseDataAnnotation(html);
     if (!props) return mkError(`Failed to parse response (HTML length: ${html.length})`, html);
 
-    // Capture the real session expiry the site embeds in the page. Only
-    // overwrite the stored value when we actually found one, so a parse miss
-    // doesn't wipe a previously-known expiry.
     const expiresAt = extractSessionExpiry(html);
     const cookieState: Record<string, unknown> = { cookie_checked_at: Date.now(), cookie_invalid: false };
     if (expiresAt) cookieState.cookie_expires_at = expiresAt;
     await persistCookieState(ctx, cookieState);
 
     const items = extractPaidItems(props);
-    const newItems = diffNewItems(items, ctx.lastSuccessfulItems);
+    const prevItems = ((ctx.lastSuccessful as DaData | null)?.items) ?? [];
+    const newItems = diffNewItems(items, prevItems, i => i.id);
 
-    const allProjects = items.filter(i => !i.qualification).length;
-    const allQuals    = items.filter(i =>  i.qualification).length;
-    const paidProjects = items.filter(i => !i.qualification && isPaidStr(i.pay)).length;
-    const paidQuals    = items.filter(i =>  i.qualification && isPaidStr(i.pay)).length;
+    const data: DaData = {
+      allProjects:           items.filter(i => !i.qualification).length,
+      allQualifications:     items.filter(i =>  i.qualification).length,
+      paidProjects:          items.filter(i => !i.qualification && isPaidStr(i.pay)).length,
+      paidQualifications:    items.filter(i =>  i.qualification && isPaidStr(i.pay)).length,
+      newAllProjects:        newItems.filter(i => !i.qualification).length,
+      newAllQualifications:  newItems.filter(i =>  i.qualification).length,
+      newPaidProjects:       newItems.filter(i => !i.qualification && isPaidStr(i.pay)).length,
+      newPaidQualifications: newItems.filter(i =>  i.qualification && isPaidStr(i.pay)).length,
+      items,
+    };
 
-    const newAllProjects = newItems.filter(i => !i.qualification).length;
-    const newAllQuals    = newItems.filter(i =>  i.qualification).length;
-    const newPaidProjects = newItems.filter(i => !i.qualification && isPaidStr(i.pay)).length;
-    const newPaidQuals    = newItems.filter(i =>  i.qualification && isPaidStr(i.pay)).length;
-
-    // Notification trigger: any new project (paid or not) OR any new qualification (paid or not).
     let notificationSent = false;
     if (newItems.length > 0) {
-      const wahaUrl = process.env.WAHA_URL;
-      if (wahaUrl && ctx.recipients.length) {
-        const waha = new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '');
-        const msg = formatNotification(newItems);
-        for (const r of ctx.recipients) {
-          try { await waha.sendText(r.phone, msg); notificationSent = true; }
-          catch (e) { console.error(`[da] waha send failed for ${r.phone}`, e); }
-        }
-      }
+      notificationSent = await ctx.notify(formatNotification(newItems), { tag: 'new-task' });
     }
 
-    return {
-      status: 'ok',
-      paidProjects, allProjects,
-      paidQualifications: paidQuals, allQualifications: allQuals,
-      newPaidProjects,   newAllProjects,
-      newPaidQualifications: newPaidQuals, newAllQualifications: newAllQuals,
-      extractedItems: items,
-      notificationSent,
-    };
+    const summary = newItems.length > 0
+      ? `+${data.newAllProjects} projects, +${data.newAllQualifications} quals`
+      : 'no change';
+
+    return { status: 'ok', summary, data, notificationSent };
   },
 };
 
 function isPaidStr(pay: string): boolean { return pay?.includes('$') ?? false; }
 
 function mkError(message: string, rawHtml?: string): RunResult {
-  return {
-    status: 'error',
-    paidProjects: 0, allProjects: 0,
-    paidQualifications: 0, allQualifications: 0,
-    newPaidProjects: 0, newAllProjects: 0,
-    newPaidQualifications: 0, newAllQualifications: 0,
-    extractedItems: [], errorMessage: message, rawHtml, notificationSent: false,
-  };
+  return { status: 'error', summary: message, errorMessage: message, rawHtml, notificationSent: false };
 }
