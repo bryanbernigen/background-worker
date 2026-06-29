@@ -46,10 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     startedAt: runHistory.startedAt, finishedAt: runHistory.finishedAt,
     status: runHistory.status, triggerType: runHistory.triggerType,
     skipReason: runHistory.skipReason, diffMs: runHistory.diffMs,
-    paidProjects: runHistory.paidProjects, allProjects: runHistory.allProjects,
-    paidQualifications: runHistory.paidQualifications, allQualifications: runHistory.allQualifications,
-    newPaidProjects: runHistory.newPaidProjects, newAllProjects: runHistory.newAllProjects,
-    newPaidQualifications: runHistory.newPaidQualifications, newAllQualifications: runHistory.newAllQualifications,
+    summary: runHistory.summary,
     notificationSent: runHistory.notificationSent,
   })
     .from(runHistory).where(where)

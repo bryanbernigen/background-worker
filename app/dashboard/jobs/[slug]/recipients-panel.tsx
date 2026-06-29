@@ -5,30 +5,30 @@ interface Recipient { id: number; name: string; phone: string }
 
 interface Props {
   slug: string;
-  /** Which recipient list this panel manages. Defaults to project alerts. */
-  kind?: 'project' | 'cookie';
+  /** Which recipient list this panel manages. Defaults to new-task alerts. */
+  tag?: 'new-task' | 'cookie-expiry';
   title?: string;
 }
 
-export default function RecipientsPanel({ slug, kind = 'project', title = 'WhatsApp recipients' }: Props) {
+export default function RecipientsPanel({ slug, tag = 'new-task', title = 'WhatsApp recipients' }: Props) {
   const [rows, setRows] = useState<Recipient[]>([]);
   const [name, setName] = useState(''); const [phone, setPhone] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [dirty, setDirty] = useState<Record<number, boolean>>({});
 
   const load = async () => {
-    const res = await fetch(`/api/jobs/${slug}/recipients?kind=${kind}`);
+    const res = await fetch(`/api/jobs/${slug}/recipients?tag=${tag}`);
     const body = await res.json();
     setRows(body.recipients ?? []);
     setDirty({});
   };
-  useEffect(() => { void load(); }, [slug, kind]);
+  useEffect(() => { void load(); }, [slug, tag]);
 
   const add = async () => {
     if (!name || !phone) return;
     const res = await fetch(`/api/jobs/${slug}/recipients`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, phone, kind }),
+      body: JSON.stringify({ name, phone, tag }),
     });
     if (res.ok) { setName(''); setPhone(''); setMsg('Added'); void load(); }
     else setMsg(`Add failed: ${res.status}`);

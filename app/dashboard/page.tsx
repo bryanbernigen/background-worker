@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   const rows = await db.select().from(jobs);
   const data = await Promise.all(rows.map(async j => ({
     job: j,
-    inRegistry: jobRegistry.some(m => m.slug === j.slug),
+    inRegistry: jobRegistry.some(m => m.type === j.type),
     ...(await latestStatus(j.id)),
   })));
 

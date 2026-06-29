@@ -6,15 +6,12 @@ interface Row {
   id: number;
   startedAt: string; finishedAt: string;
   status: string; triggerType: string; skipReason: string | null; diffMs: number | null;
-  paidProjects: number; allProjects: number;
-  paidQualifications: number; allQualifications: number;
-  newPaidProjects: number; newAllProjects: number;
-  newPaidQualifications: number; newAllQualifications: number;
+  summary: string;
   notificationSent: boolean;
 }
 
 interface Detail extends Row {
-  extractedItems: unknown[] | null;
+  data: unknown;
   rawHtml: string | null;
   errorMessage: string | null;
 }
@@ -24,7 +21,7 @@ type NotifiedFilter = 'all' | 'yes' | 'no';
 type StatusFilter   = 'all' | 'ok' | 'error' | 'skipped';
 type TriggerFilter  = 'all' | 'scheduled' | 'manual';
 
-const COL_COUNT = 9;
+const COL_COUNT = 6;
 
 export default function HistoryTable({ slug }: { slug: string }) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -119,10 +116,7 @@ export default function HistoryTable({ slug }: { slug: string }) {
                 <Th>Time</Th>
                 <Th>Status</Th>
                 <Th>Trigger</Th>
-                <Th className="text-right">Projects<br/><span className="font-normal normal-case text-[10px] text-gray-400">paid / all</span></Th>
-                <Th className="text-right">Quals<br/><span className="font-normal normal-case text-[10px] text-gray-400">paid / all</span></Th>
-                <Th className="text-right">New Proj<br/><span className="font-normal normal-case text-[10px] text-gray-400">paid / all</span></Th>
-                <Th className="text-right">New Quals<br/><span className="font-normal normal-case text-[10px] text-gray-400">paid / all</span></Th>
+                <Th>Result</Th>
                 <Th className="text-right">Δ</Th>
                 <Th></Th>
               </tr>
@@ -148,14 +142,7 @@ export default function HistoryTable({ slug }: { slug: string }) {
                       )}
                     </Td>
                     <Td><TriggerBadge t={r.triggerType} /></Td>
-                    <Td className="text-right font-mono">{r.paidProjects}<span className="text-gray-300">/</span>{r.allProjects}</Td>
-                    <Td className="text-right font-mono">{r.paidQualifications}<span className="text-gray-300">/</span>{r.allQualifications}</Td>
-                    <Td className="text-right font-mono">
-                      <NewCount paid={r.newPaidProjects} all={r.newAllProjects} />
-                    </Td>
-                    <Td className="text-right font-mono">
-                      <NewCount paid={r.newPaidQualifications} all={r.newAllQualifications} />
-                    </Td>
+                    <Td className="text-sm text-gray-600">{r.summary}</Td>
                     <Td className="text-right text-gray-500 font-mono text-xs">
                       {r.diffMs != null ? formatDurationMs(r.diffMs) : '—'}
                     </Td>
@@ -217,15 +204,6 @@ function TriggerBadge({ t }: { t: string }) {
   return <span className={`text-xs px-2 py-0.5 rounded font-medium ${cls}`}>{t}</span>;
 }
 
-function NewCount({ paid, all }: { paid: number; all: number }) {
-  if (all === 0) return <span className="text-gray-300">—</span>;
-  return (
-    <span className="text-green-700 font-semibold">
-      {paid}<span className="text-gray-400">/</span>{all}
-    </span>
-  );
-}
-
 function FilterSelect<T extends string>({ label, value, onChange, options }: {
   label: string;
   value: T;
@@ -269,6 +247,7 @@ function formatDate(iso: string): string {
 }
 
 function DetailView({ detail }: { detail: Detail }) {
+  const items = (detail.data as { items?: unknown[] } | null)?.items ?? null;
   return (
     <div className="space-y-2 text-xs">
       {detail.errorMessage && (
@@ -276,12 +255,12 @@ function DetailView({ detail }: { detail: Detail }) {
           {detail.errorMessage}
         </div>
       )}
-      {detail.extractedItems && (
+      {detail.data != null && (
         <details>
           <summary className="cursor-pointer text-gray-700 select-none">
-            Extracted items <span className="text-gray-400">({(detail.extractedItems as unknown[]).length})</span>
+            Run data{items ? <span className="text-gray-400"> ({items.length} items)</span> : null}
           </summary>
-          <pre className="overflow-auto max-h-80 mt-1 p-2 bg-white border rounded">{JSON.stringify(detail.extractedItems, null, 2)}</pre>
+          <pre className="overflow-auto max-h-80 mt-1 p-2 bg-white border rounded">{JSON.stringify(detail.data, null, 2)}</pre>
         </details>
       )}
       {detail.rawHtml && (

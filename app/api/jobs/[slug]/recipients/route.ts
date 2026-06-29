@@ -5,12 +5,12 @@ import { db } from '@/lib/db/client';
 import { jobs, recipients } from '@/lib/db/schema';
 import { requireSession } from '@/lib/api/require-session';
 
-const kindSchema = z.enum(['project', 'cookie']);
+const tagSchema = z.enum(['new-task', 'cookie-expiry']);
 
 const create = z.object({
   name:  z.string().min(1),
   phone: z.string().min(5),
-  kind:  kindSchema.optional(),
+  tag:   tagSchema.optional(),
 });
 
 async function getJobOr404(slug: string) {
@@ -24,11 +24,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const job = await getJobOr404(slug);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
-  // Optional ?kind=project|cookie filter; omitted → all recipients.
-  const kindParam = new URL(req.url).searchParams.get('kind');
-  const kind = kindSchema.safeParse(kindParam);
-  const where = kind.success
-    ? and(eq(recipients.jobId, job.id), eq(recipients.kind, kind.data))
+  // Optional ?tag=new-task|cookie-expiry filter; omitted → all recipients.
+  const tagParam = new URL(req.url).searchParams.get('tag');
+  const tag = tagSchema.safeParse(tagParam);
+  const where = tag.success
+    ? and(eq(recipients.jobId, job.id), eq(recipients.tag, tag.data))
     : eq(recipients.jobId, job.id);
 
   const rows = await db.select().from(recipients).where(where);
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
 
   const [row] = await db.insert(recipients)
-    .values({ jobId: job.id, name: parsed.data.name, phone: parsed.data.phone, kind: parsed.data.kind ?? 'project' })
+    .values({ jobId: job.id, name: parsed.data.name, phone: parsed.data.phone, tag: parsed.data.tag ?? 'new-task' })
     .returning();
   return NextResponse.json({ recipient: row }, { status: 201 });
 }
