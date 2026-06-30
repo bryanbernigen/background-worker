@@ -4,7 +4,7 @@ import { jobs, recipients, runHistory, type Job } from '@/lib/db/schema';
 import { getJob } from '@/lib/jobs/registry';
 import type { RunResult } from '@/lib/jobs/types';
 import { buildNotifier, wahaChannelFromEnv } from '@/lib/notify';
-import { computeNextRunAt, isWithinWindow } from './window';
+import { computeNextRunAt, isWithinWindow, type ScheduleCfg } from './window';
 import { withJobLock } from './lock';
 import { WahaClient } from '@/lib/waha';
 
@@ -81,6 +81,14 @@ export async function reschedule(jobId: number): Promise<void> {
   if (existing) { clearTimeout(existing); timers.delete(jobId); }
   await armTimer(jobId);
   await armExpiryTimer(jobId);
+}
+
+/** Clear a job's run + expiry timers (e.g. when the instance is deleted). */
+export function unschedule(jobId: number): void {
+  const t = timers.get(jobId);
+  if (t) { clearTimeout(t); timers.delete(jobId); }
+  const e = expiryTimers.get(jobId);
+  if (e) { clearTimeout(e); expiryTimers.delete(jobId); }
 }
 
 /** Manual run (HTTP-triggered). Returns lock_busy if a scheduled run is in flight. */
@@ -321,13 +329,16 @@ async function executeRun(jobId: number, trigger: Trigger): Promise<ExecOutcome>
   return outcome.value;
 }
 
-function jobCfg(job: Job) {
+function jobCfg(job: Job): ScheduleCfg {
   return {
+    scheduleType: job.scheduleType as ScheduleCfg['scheduleType'],
     dayStartHour: job.dayStartHour,
     dayEndHour:   job.dayEndHour,
     tzOffsetH:    job.tzOffsetH,
     minIntervalS: job.minIntervalS,
     maxIntervalS: job.maxIntervalS,
+    intervalS:    job.intervalS,
+    cronExpr:     job.cronExpr,
   };
 }
 
