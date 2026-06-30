@@ -4,6 +4,7 @@ import { db } from '@/lib/db/client';
 import { jobs } from '@/lib/db/schema';
 import { requireSession } from '@/lib/api/require-session';
 import { decrypt } from '@/lib/crypto';
+import { unschedule } from '@/lib/scheduler';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const guard = await requireSession(); if (!guard.ok) return guard.res;
@@ -40,6 +41,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
       custom: customOut,
     },
   });
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const { slug } = await params;
+
+  const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
+  if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+
+  unschedule(job.id);
+  await db.delete(jobs).where(eq(jobs.id, job.id)); // FK cascade removes recipients + run_history
+  return new NextResponse(null, { status: 204 });
 }
 
 function mask(s: string): string {
