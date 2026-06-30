@@ -21,7 +21,7 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return notFound();
-  const mod = getJob(slug);
+  const mod = getJob(job.type);
 
   const custom = (job.customSettings ?? {}) as Record<string, unknown>;
   const customForPanel: Record<string, unknown> = {};
@@ -69,8 +69,8 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
           dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
         }} />
         {Panel && <Panel jobId={job.id} current={customForPanel} />}
-        <RecipientsPanel slug={slug} kind="project" title="WhatsApp recipients (new-task alerts)" />
-        <RecipientsPanel slug={slug} kind="cookie" title="Cookie-expiry alert recipients" />
+        <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" />
+        <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" />
         <HistoryTable slug={slug} />
       </div>
     </div>

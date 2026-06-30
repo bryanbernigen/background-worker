@@ -1,4 +1,4 @@
-import type { PaidItem } from '@/lib/jobs/types';
+import type { PaidItem } from './types';
 
 interface DataAnnotationProps {
   // NOTE: reportableProjectsInfo is intentionally NOT scraped. It is a separate

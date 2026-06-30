@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatNotification } from './format';
-import type { PaidItem } from '@/lib/jobs/types';
+import type { PaidItem } from './types';
 
 const item = (over: Partial<PaidItem>): PaidItem => ({
   id: 'x', name: 'X', pay: '$10', availableTasksFor: '5', created: '', qualification: false, ...over,

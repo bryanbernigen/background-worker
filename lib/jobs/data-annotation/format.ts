@@ -1,4 +1,4 @@
-import type { PaidItem } from '@/lib/jobs/types';
+import type { PaidItem } from './types';
 
 export function formatNotification(items: PaidItem[]): string {
   const projectItems = items.filter(i => !i.qualification);

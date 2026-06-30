@@ -3,17 +3,21 @@ import { db } from '@/lib/db/client';
 import { jobs } from '@/lib/db/schema';
 import { jobRegistry } from './registry';
 
+/**
+ * Phase 1: seed one instance per registered type if absent, keyed by slug == type.
+ * (Phase 2 removes auto-seeding in favour of admin-created instances.)
+ */
 export async function seedRegistryJobs(): Promise<void> {
   for (const mod of jobRegistry) {
-    const [existing] = await db.select().from(jobs).where(eq(jobs.slug, mod.slug)).limit(1);
+    const [existing] = await db.select().from(jobs).where(eq(jobs.slug, mod.type)).limit(1);
     if (existing) continue;
     await db.insert(jobs).values({
-      slug: mod.slug,
+      slug: mod.type,
+      type: mod.type,
       title: mod.defaultMeta.title,
       url: mod.defaultMeta.url,
       description: mod.defaultMeta.description,
     });
-    console.log(`[seed] inserted job '${mod.slug}'`);
+    console.log(`[seed] inserted job '${mod.type}'`);
   }
-  // Orphans (DB rows with a slug no longer in the registry) are left alone.
 }
