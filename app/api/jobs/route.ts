@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db/client';
 import { jobs, recipients } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireAdmin } from '@/lib/access/role';
 import { getJob } from '@/lib/jobs/registry';
 import { createJobSchema, buildJobInsert, CreateJobError } from '@/lib/jobs/create-job';
 import { reschedule } from '@/lib/scheduler';
 
 export async function POST(req: NextRequest) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireAdmin(); if (!guard.ok) return guard.res;
 
   const parsed = createJobSchema.safeParse(await req.json());
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });

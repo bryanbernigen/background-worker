@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireAdmin } from '@/lib/access/role';
 import { runManual } from '@/lib/scheduler';
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const guard = await requireSession();
+  const guard = await requireAdmin();
   if (!guard.ok) return guard.res;
   const { slug } = await params;
 
