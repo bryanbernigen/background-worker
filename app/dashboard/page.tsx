@@ -1,15 +1,16 @@
 import Link from 'next/link';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { desc, eq } from 'drizzle-orm';
-import { verifySessionToken } from '@/lib/auth';
 import { db } from '@/lib/db/client';
 import { jobs, runHistory } from '@/lib/db/schema';
 import { jobRegistry } from '@/lib/jobs/registry';
+import { resolveRole } from '@/lib/access/role';
+import { getAdminContactPhone } from '@/lib/access/settings';
 import { externalServices, GITHUB_REPO_URL } from '@/lib/services';
 import Card from '@/components/ui/card';
 import Badge from '@/components/ui/badge';
 import Button from '@/components/ui/button';
+import ContactAdmin from './contact-admin';
 
 async function latestStatus(jobId: number): Promise<{ status: string; when: Date | null }> {
   const [row] = await db.select({ status: runHistory.status, startedAt: runHistory.startedAt })
@@ -19,10 +20,14 @@ async function latestStatus(jobId: number): Promise<{ status: string; when: Date
 }
 
 export default async function DashboardPage() {
-  const token = (await cookies()).get('session')?.value;
-  if (!token || !(await verifySessionToken(token))) redirect('/');
+  const role = await resolveRole();
+  if (!role) redirect('/');
+  const isAdmin = role === 'admin';
 
-  const rows = await db.select().from(jobs);
+  const rows = isAdmin
+    ? await db.select().from(jobs)
+    : await db.select().from(jobs).where(eq(jobs.visibleToGuest, true));
+  const contactEnabled = !isAdmin && !!(await getAdminContactPhone()) && !!process.env.WAHA_URL;
   const data = await Promise.all(rows.map(async j => ({
     job: j,
     inRegistry: jobRegistry.some(m => m.type === j.type),
@@ -34,9 +39,13 @@ export default async function DashboardPage() {
       <div className="max-w-4xl mx-auto">
         <header className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Auto Checker</h1>
-          <form action="/api/auth/logout" method="POST">
-            <button className="text-sm text-gray-500 hover:text-gray-700">Logout</button>
-          </form>
+          {isAdmin ? (
+            <form action="/api/auth/logout" method="POST">
+              <button className="text-sm text-gray-500 hover:text-gray-700">Logout</button>
+            </form>
+          ) : contactEnabled ? (
+            <ContactAdmin />
+          ) : null}
         </header>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {data.map(({ job, inRegistry, status, when }) => (

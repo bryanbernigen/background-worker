@@ -1,7 +1,6 @@
-import { cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { eq } from 'drizzle-orm';
-import { verifySessionToken } from '@/lib/auth';
+import { resolveRole } from '@/lib/access/role';
 import { db } from '@/lib/db/client';
 import { jobs } from '@/lib/db/schema';
 import { getJob } from '@/lib/jobs/registry';
@@ -16,11 +15,13 @@ import RunNowButton from './run-now-button';
 
 export default async function JobPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const token = (await cookies()).get('session')?.value;
-  if (!token || !(await verifySessionToken(token))) redirect('/');
+  const role = await resolveRole();
+  if (!role) redirect('/');
+  const isAdmin = role === 'admin';
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return notFound();
+  if (!isAdmin && !job.visibleToGuest) return notFound();
   const mod = getJob(job.type);
 
   const custom = (job.customSettings ?? {}) as Record<string, unknown>;
@@ -46,9 +47,16 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
       <div className="max-w-6xl mx-auto space-y-6">
         <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</a>
 
-        <EditableHeader slug={slug} initial={{
-          title: job.title, url: job.url, description: job.description,
-        }} />
+        {isAdmin ? (
+          <EditableHeader slug={slug} initial={{
+            title: job.title, url: job.url, description: job.description,
+          }} />
+        ) : (
+          <div>
+            <h1 className="text-2xl font-bold">{job.title}</h1>
+            <p className="text-sm text-gray-500">{job.description}</p>
+          </div>
+        )}
 
         <div className="flex items-center gap-4">
           <Countdown slug={slug} initial={{
@@ -58,19 +66,23 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
             maxIntervalS: job.maxIntervalS,
             enabled: job.enabled,
           }} />
-          <div className="shrink-0 flex items-start gap-2">
-            <RunNowButton slug={slug} />
-            <EnableToggle slug={slug} initialEnabled={job.enabled} />
-          </div>
+          {isAdmin && (
+            <div className="shrink-0 flex items-start gap-2">
+              <RunNowButton slug={slug} />
+              <EnableToggle slug={slug} initialEnabled={job.enabled} />
+            </div>
+          )}
         </div>
 
-        <ScheduleForm slug={slug} initial={{
-          minIntervalS: job.minIntervalS, maxIntervalS: job.maxIntervalS,
-          dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
-        }} />
-        {Panel && <Panel jobId={job.id} current={customForPanel} />}
-        <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" />
-        <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" />
+        {isAdmin && (
+          <ScheduleForm slug={slug} initial={{
+            minIntervalS: job.minIntervalS, maxIntervalS: job.maxIntervalS,
+            dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
+          }} />
+        )}
+        {isAdmin && Panel && <Panel jobId={job.id} current={customForPanel} />}
+        <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" admin={isAdmin} />
+        <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" admin={isAdmin} />
         <HistoryTable slug={slug} />
       </div>
     </div>
