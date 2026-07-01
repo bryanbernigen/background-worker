@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireViewer, requireAdmin } from '@/lib/access/role';
+import { maskJobCustom } from '@/lib/access/mask';
 import { decrypt } from '@/lib/crypto';
 import { unschedule } from '@/lib/scheduler';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireViewer(); if (!guard.ok) return guard.res;
+  const { role } = guard;
   const { slug } = await params;
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+  if (role === 'guest' && !job.visibleToGuest) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
   // Convention: any field ending in `_encrypted` produces a `_preview` sibling
   // (masked first/last chars) on the wire. The raw ciphertext OR plaintext
@@ -38,13 +41,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
       dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
       enabled: job.enabled,
       nextRunAt: job.nextRunAt, lastRunAt: job.lastRunAt,
-      custom: customOut,
+      custom: maskJobCustom(role, customOut),
     },
   });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireAdmin(); if (!guard.ok) return guard.res;
   const { slug } = await params;
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
