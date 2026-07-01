@@ -7,6 +7,7 @@ import { requireSession } from '@/lib/api/require-session';
 import { encrypt } from '@/lib/crypto';
 import { getJob } from '@/lib/jobs/registry';
 import { reschedule, runManual } from '@/lib/scheduler';
+import { validateSchedule, type ScheduleCfg } from '@/lib/scheduler/window';
 
 const metaSchema = z.object({
   title:       z.string().min(1).optional(),
@@ -15,6 +16,9 @@ const metaSchema = z.object({
 }).strict();
 
 const scheduleSchema = z.object({
+  scheduleType: z.enum(['window', 'interval', 'cron']).optional(),
+  intervalS:    z.number().int().min(30).max(86400).nullable().optional(),
+  cronExpr:     z.string().min(1).nullable().optional(),
   minIntervalS: z.number().int().min(30).max(86400).optional(),
   maxIntervalS: z.number().int().min(30).max(86400).optional(),
   dayStartHour: z.number().int().min(0).max(23).optional(),
@@ -71,13 +75,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
     }
   }
 
-  const min = body.schedule?.minIntervalS ?? job.minIntervalS;
-  const max = body.schedule?.maxIntervalS ?? job.maxIntervalS;
-  if (min > max) return NextResponse.json({ error: 'minIntervalS > maxIntervalS' }, { status: 400 });
-
-  const startH = body.schedule?.dayStartHour ?? job.dayStartHour;
-  const endH   = body.schedule?.dayEndHour   ?? job.dayEndHour;
-  if (startH >= endH) return NextResponse.json({ error: 'dayStartHour >= dayEndHour' }, { status: 400 });
+  const mergedCfg: ScheduleCfg = {
+    scheduleType: (body.schedule?.scheduleType ?? job.scheduleType) as ScheduleCfg['scheduleType'],
+    minIntervalS: body.schedule?.minIntervalS ?? job.minIntervalS,
+    maxIntervalS: body.schedule?.maxIntervalS ?? job.maxIntervalS,
+    dayStartHour: body.schedule?.dayStartHour ?? job.dayStartHour,
+    dayEndHour:   body.schedule?.dayEndHour   ?? job.dayEndHour,
+    tzOffsetH:    body.schedule?.tzOffsetH    ?? job.tzOffsetH,
+    intervalS:    body.schedule?.intervalS    ?? job.intervalS,
+    cronExpr:     body.schedule?.cronExpr     ?? job.cronExpr,
+  };
+  try { validateSchedule(mergedCfg); }
+  catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : 'invalid schedule' }, { status: 400 }); }
 
   await db.update(jobs).set({
     ...(body.meta ?? {}),

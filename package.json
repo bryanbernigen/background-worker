@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "croner": "^9.1.0",
     "drizzle-orm": "^0.36.0",
     "next": "16.2.6",
     "pg": "^8.13.0",

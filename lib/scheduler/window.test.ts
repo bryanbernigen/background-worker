@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   isWithinWindow, nextWindowOpening, jitter, computeNextRunAt,
+  cronNextRun, validateSchedule, type ScheduleCfg,
 } from './window';
 
-const W = { dayStartHour: 7, dayEndHour: 23, tzOffsetH: 7 }; // WIB
+const W: ScheduleCfg = {
+  scheduleType: 'window',
+  minIntervalS: 600, maxIntervalS: 1800,
+  dayStartHour: 7, dayEndHour: 23, tzOffsetH: 7, // WIB
+  intervalS: null, cronExpr: null,
+};
 
 // Helper to build a UTC instant given a WIB wall-clock.
 const wib = (yyyy: number, mm: number, dd: number, h: number, min = 0) =>
@@ -75,5 +81,50 @@ describe('computeNextRunAt', () => {
       expect(offsetS).toBeGreaterThanOrEqual(600);
       expect(offsetS).toBeLessThanOrEqual(1800);
     }
+  });
+});
+
+describe('interval schedule', () => {
+  it('computeNextRunAt = now + intervalS', () => {
+    const now = new Date('2026-07-01T00:00:00Z');
+    const next = computeNextRunAt(now, { ...W, scheduleType: 'interval', intervalS: 300 });
+    expect(next.getTime()).toBe(now.getTime() + 300_000);
+  });
+  it('isWithinWindow is always true for interval', () => {
+    expect(isWithinWindow(new Date('2026-07-01T20:00:00Z'), { ...W, scheduleType: 'interval', intervalS: 300 })).toBe(true);
+  });
+});
+
+describe('cron schedule (offset model)', () => {
+  it('fires daily at 09:00 in the job offset (tz+7 -> 02:00 UTC)', () => {
+    // now = 2026-07-01 00:00 UTC == 07:00 local(+7); next 09:00 local == 02:00 UTC same day
+    const next = cronNextRun(new Date('2026-07-01T00:00:00Z'), '0 9 * * *', 7);
+    expect(next.toISOString()).toBe('2026-07-01T02:00:00.000Z');
+  });
+  it('computeNextRunAt routes cron through cronNextRun', () => {
+    const next = computeNextRunAt(new Date('2026-07-01T00:00:00Z'), { ...W, scheduleType: 'cron', cronExpr: '0 9 * * *' });
+    expect(next.toISOString()).toBe('2026-07-01T02:00:00.000Z');
+  });
+  it('isWithinWindow is always true for cron', () => {
+    expect(isWithinWindow(new Date('2026-07-01T03:00:00Z'), { ...W, scheduleType: 'cron', cronExpr: '0 9 * * *' })).toBe(true);
+  });
+});
+
+describe('validateSchedule', () => {
+  it('accepts a valid window/interval/cron', () => {
+    expect(() => validateSchedule(W)).not.toThrow();
+    expect(() => validateSchedule({ ...W, scheduleType: 'interval', intervalS: 300 })).not.toThrow();
+    expect(() => validateSchedule({ ...W, scheduleType: 'cron', cronExpr: '*/15 * * * *' })).not.toThrow();
+  });
+  it('rejects interval without a positive intervalS', () => {
+    expect(() => validateSchedule({ ...W, scheduleType: 'interval', intervalS: null })).toThrow();
+    expect(() => validateSchedule({ ...W, scheduleType: 'interval', intervalS: 0 })).toThrow();
+  });
+  it('rejects cron with no/invalid expression', () => {
+    expect(() => validateSchedule({ ...W, scheduleType: 'cron', cronExpr: null })).toThrow();
+    expect(() => validateSchedule({ ...W, scheduleType: 'cron', cronExpr: 'not a cron' })).toThrow();
+  });
+  it('rejects window with min > max', () => {
+    expect(() => validateSchedule({ ...W, minIntervalS: 2000, maxIntervalS: 1000 })).toThrow();
   });
 });
