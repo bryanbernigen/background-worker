@@ -63,22 +63,22 @@ export default function Countdown({ slug, initial }: { slug: string; initial: Jo
       />
       <div className="mt-1.5 text-sm flex items-center justify-between gap-3">
         {paused ? (
-          <span className="text-gray-500">⏸ Paused — schedule disabled</span>
+          <span className="text-muted">⏸ Paused — schedule disabled</span>
         ) : !mounted ? (
-          <span className="text-gray-400">Calculating…</span>
+          <span className="text-muted">Calculating…</span>
         ) : isRunning && nextRunMs ? (
-          <span className="text-amber-700">
+          <span className="text-warn">
             Running for <strong>{formatDurationS((now - nextRunMs) / 1000)}</strong>…
           </span>
         ) : remainingS !== null && remainingS > 0 && nextRunMs ? (
-          <span className="text-gray-700">
+          <span className="text-text">
             Next run at <strong>{formatClock(nextRunMs)}</strong>
-            <span className="text-gray-400"> · {formatDurationS(remainingS)}</span>
+            <span className="text-muted"> · {formatDurationS(remainingS)}</span>
           </span>
         ) : (
-          <span className="text-gray-500">No next run scheduled</span>
+          <span className="text-muted">No next run scheduled</span>
         )}
-        <span className="text-xs text-gray-400 shrink-0">
+        <span className="text-xs text-muted shrink-0">
           window: {formatDurationS(snapshot.minIntervalS)} – {formatDurationS(snapshot.maxIntervalS)}
         </span>
       </div>
@@ -118,16 +118,16 @@ function ProgressBar({ remainingS, minS, maxS, running, muted }: BarProps) {
   let fillPct = remainingS != null ? (remainingS / denom) * 100 : 0;
   fillPct = Math.max(0, Math.min(100, fillPct));
   const minTickPct = (minS / denom) * 100;
-  const fillColor = muted ? 'bg-gray-300' : running ? 'bg-amber-500 animate-pulse' : 'bg-blue-500';
+  const fillColor = muted ? 'bg-off' : running ? 'bg-warn animate-pulse' : 'bg-accent';
 
   return (
-    <div className={`relative w-full h-3 rounded-full overflow-hidden ${muted ? 'bg-gray-100' : 'bg-gray-200'}`}>
+    <div className={`relative w-full h-3 rounded-full overflow-hidden ${muted ? 'bg-surface-2' : 'bg-surface-2'}`}>
       <div
         className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-linear ${fillColor}`}
         style={{ width: `${fillPct}%` }}
       />
       <div
-        className="absolute inset-y-0 w-px bg-gray-500/60"
+        className="absolute inset-y-0 w-px bg-muted/60"
         style={{ left: `${minTickPct}%` }}
         title={`min interval (${minS}s) — earliest possible fire`}
       />

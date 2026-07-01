@@ -1,11 +1,11 @@
 export default function Badge({ children, color = 'gray' }: { children: React.ReactNode; color?: 'green' | 'red' | 'gray' | 'blue' | 'orange' | 'yellow' }) {
   const colors = {
-    green: 'bg-green-100 text-green-800',
-    red: 'bg-red-100 text-red-800',
-    gray: 'bg-gray-100 text-gray-800',
-    blue: 'bg-blue-100 text-blue-800',
-    orange: 'bg-orange-600 text-black',
-    yellow: 'bg-yellow-500 text-black',
+    green: 'bg-ok/20 text-ok',
+    red: 'bg-error/20 text-error',
+    gray: 'bg-off/20 text-muted',
+    blue: 'bg-accent/20 text-accent',
+    orange: 'bg-warn/20 text-warn',
+    yellow: 'bg-warn/20 text-warn',
   };
   return (
     <span className={`inline-block px-2 py-1 rounded text-sm font-medium ${colors[color]}`}>

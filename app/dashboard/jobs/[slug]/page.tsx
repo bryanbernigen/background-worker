@@ -43,20 +43,19 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
   const Panel = mod?.CustomSettingsPanel;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <a href="/dashboard" className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</a>
+    <div className="max-w-4xl mx-auto p-8 space-y-6">
+      <a href="/dashboard" className="text-sm text-muted hover:text-text">← Console</a>
 
-        {isAdmin ? (
-          <EditableHeader slug={slug} initial={{
-            title: job.title, url: job.url, description: job.description,
-          }} />
-        ) : (
-          <div>
-            <h1 className="text-2xl font-bold">{job.title}</h1>
-            <p className="text-sm text-gray-500">{job.description}</p>
-          </div>
-        )}
+      {isAdmin ? (
+        <EditableHeader slug={slug} initial={{
+          title: job.title, url: job.url, description: job.description,
+        }} />
+      ) : (
+        <div>
+          <h1 className="text-2xl font-bold">{job.title}</h1>
+          <p className="text-sm text-muted">{job.description}</p>
+        </div>
+      )}
 
         <div className="flex items-center gap-4">
           <Countdown slug={slug} initial={{
@@ -74,17 +73,17 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
           )}
         </div>
 
-        {isAdmin && (
-          <ScheduleForm slug={slug} initial={{
-            minIntervalS: job.minIntervalS, maxIntervalS: job.maxIntervalS,
-            dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
-          }} />
-        )}
-        {isAdmin && Panel && <Panel jobId={job.id} current={customForPanel} />}
-        <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" admin={isAdmin} />
-        <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" admin={isAdmin} />
-        <HistoryTable slug={slug} />
-      </div>
+      {isAdmin && (
+        <ScheduleForm slug={slug} initial={{
+          scheduleType: job.scheduleType, minIntervalS: job.minIntervalS, maxIntervalS: job.maxIntervalS,
+          dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
+          intervalS: job.intervalS, cronExpr: job.cronExpr,
+        }} />
+      )}
+      {isAdmin && Panel && <Panel jobId={job.id} current={customForPanel} />}
+      <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" admin={isAdmin} />
+      <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" admin={isAdmin} />
+      <HistoryTable slug={slug} />
     </div>
   );
 }

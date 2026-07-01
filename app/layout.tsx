@@ -8,8 +8,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Auto Checker",
-  description: "DataAnnotation poll checker with WhatsApp alerts",
+  title: "Background Worker",
+  description: "Job runtime console",
 };
 
 export default function RootLayout({

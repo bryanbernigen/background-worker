@@ -27,17 +27,17 @@ export default function EnableToggle({ slug, initialEnabled }: { slug: string; i
       <button
         onClick={toggle}
         disabled={busy}
-        className={`px-3 py-1.5 rounded text-white text-sm font-medium disabled:opacity-50 ${
-          enabled ? 'bg-gray-600 hover:bg-gray-700' : 'bg-green-600 hover:bg-green-700'
+        className={`px-3 py-1.5 rounded text-sm font-medium disabled:opacity-50 ${
+          enabled ? 'bg-surface-2 border border-border text-text hover:bg-surface' : 'bg-accent text-bg hover:opacity-90'
         }`}
         title={enabled ? 'Pause the schedule (no automatic runs)' : 'Resume the schedule'}
       >
         {busy ? '…' : enabled ? 'Disable job' : 'Enable job'}
       </button>
-      <span className={`text-xs ${enabled ? 'text-green-700' : 'text-gray-500'}`}>
+      <span className={`text-xs ${enabled ? 'text-ok' : 'text-muted'}`}>
         {enabled ? '● scheduled' : '○ paused'}
       </span>
-      {err && <span className="text-xs text-red-600">{err}</span>}
+      {err && <span className="text-xs text-error">{err}</span>}
     </div>
   );
 }

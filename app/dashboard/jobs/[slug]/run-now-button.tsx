@@ -17,10 +17,10 @@ export default function RunNowButton({ slug }: { slug: string }) {
   return (
     <div>
       <button disabled={busy} onClick={trigger}
-        className="px-3 py-1.5 rounded bg-green-600 text-white disabled:opacity-50">
-        {busy ? 'Running…' : 'Run check now'}
+        className="px-3 py-1.5 rounded bg-accent text-bg font-medium disabled:opacity-50">
+        {busy ? 'Running…' : 'Run now'}
       </button>
-      {msg && <div className="text-xs text-gray-500 mt-1">{msg}</div>}
+      {msg && <div className="text-xs text-muted mt-1">{msg}</div>}
     </div>
   );
 }
