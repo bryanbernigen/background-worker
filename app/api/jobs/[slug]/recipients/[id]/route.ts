@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db/client';
 import { jobs, recipients } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireAdmin } from '@/lib/access/role';
 
 const update = z.object({ name: z.string().min(1).optional(), phone: z.string().min(5).optional() });
 
@@ -16,7 +16,7 @@ async function lookup(slug: string, id: number) {
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ slug: string; id: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireAdmin(); if (!guard.ok) return guard.res;
   const { slug, id } = await params;
   const recId = Number(id);
   if (!Number.isInteger(recId)) return NextResponse.json({ error: 'bad id' }, { status: 400 });
@@ -33,7 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ slug
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ slug: string; id: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireAdmin(); if (!guard.ok) return guard.res;
   const { slug, id } = await params;
   const recId = Number(id);
   if (!Number.isInteger(recId)) return NextResponse.json({ error: 'bad id' }, { status: 400 });

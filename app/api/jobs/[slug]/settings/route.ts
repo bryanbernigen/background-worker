@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db/client';
 import { jobs } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireAdmin } from '@/lib/access/role';
 import { encrypt } from '@/lib/crypto';
 import { getJob } from '@/lib/jobs/registry';
 import { reschedule, runManual } from '@/lib/scheduler';
@@ -34,7 +34,7 @@ const bodySchema = z.object({
 }).strict();
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const guard = await requireSession();
+  const guard = await requireAdmin();
   if (!guard.ok) return guard.res;
   const { slug } = await params;
 

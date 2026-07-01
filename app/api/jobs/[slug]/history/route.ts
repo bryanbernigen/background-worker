@@ -2,14 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { and, eq, desc, count } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs, runHistory } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireViewer } from '@/lib/access/role';
+import { maskRunDetail } from '@/lib/access/mask';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireViewer(); if (!guard.ok) return guard.res;
+  const { role } = guard;
   const { slug } = await params;
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+  if (role === 'guest' && !job.visibleToGuest) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
   const url = new URL(req.url);
   const page     = Math.max(1,  parseInt(url.searchParams.get('page')     ?? '1',  10));
@@ -25,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     const [row] = await db.select().from(runHistory)
       .where(eq(runHistory.id, id)).limit(1);
     if (!row || row.jobId !== job.id) return NextResponse.json({ error: 'not found' }, { status: 404 });
-    return NextResponse.json({ detail: row });
+    return NextResponse.json({ detail: maskRunDetail(role, row) });
   }
 
   const where = and(

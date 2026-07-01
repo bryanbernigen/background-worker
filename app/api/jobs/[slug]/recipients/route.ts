@@ -3,7 +3,8 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/lib/db/client';
 import { jobs, recipients } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireViewer, requireAdmin } from '@/lib/access/role';
+import { maskRecipient } from '@/lib/access/mask';
 
 const tagSchema = z.enum(['new-task', 'cookie-expiry']);
 
@@ -19,10 +20,12 @@ async function getJobOr404(slug: string) {
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireViewer(); if (!guard.ok) return guard.res;
+  const { role } = guard;
   const { slug } = await params;
   const job = await getJobOr404(slug);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+  if (role === 'guest' && !job.visibleToGuest) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
   // Optional ?tag=new-task|cookie-expiry filter; omitted → all recipients.
   const tagParam = new URL(req.url).searchParams.get('tag');
@@ -32,11 +35,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
     : eq(recipients.jobId, job.id);
 
   const rows = await db.select().from(recipients).where(where);
-  return NextResponse.json({ recipients: rows });
+  return NextResponse.json({ recipients: rows.map(r => maskRecipient(role, r)) });
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireAdmin(); if (!guard.ok) return guard.res;
   const { slug } = await params;
   const job = await getJobOr404(slug);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });

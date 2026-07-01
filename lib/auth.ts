@@ -1,5 +1,6 @@
 export interface SessionPayload {
   username: string;
+  role: 'admin' | 'guest';
   exp: number;
 }
 
@@ -27,10 +28,10 @@ function fromBase64url(str: string): string {
   return atob(padded);
 }
 
-export async function createSessionToken(username: string): Promise<string> {
+export async function createSessionToken(username: string, role: 'admin' | 'guest' = 'admin'): Promise<string> {
   const secret = process.env.JWT_SECRET || 'dev-secret-change-in-prod';
   const exp = Date.now() + 7 * 24 * 60 * 60 * 1000;
-  const payload = JSON.stringify({ username, exp });
+  const payload = JSON.stringify({ username, role, exp });
   const payloadB64 = toBase64url(payload);
   const sig = await hmac(payloadB64, secret);
   return `${payloadB64}.${sig}`;
@@ -45,9 +46,9 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
     const expectedSig = await hmac(payloadB64, secret);
     if (sig !== expectedSig) return null;
 
-    const { username, exp } = JSON.parse(fromBase64url(payloadB64));
+    const { username, role, exp } = JSON.parse(fromBase64url(payloadB64));
     if (Date.now() > exp) return null;
-    return { username, exp };
+    return { username, role: role === 'guest' ? 'guest' : 'admin', exp };
   } catch {
     return null;
   }

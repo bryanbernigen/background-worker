@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs, recipients } from '@/lib/db/schema';
-import { requireSession } from '@/lib/api/require-session';
+import { requireAdmin } from '@/lib/access/role';
 import { WahaClient } from '@/lib/waha';
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ slug: string; id: string }> }) {
-  const guard = await requireSession(); if (!guard.ok) return guard.res;
+  const guard = await requireAdmin(); if (!guard.ok) return guard.res;
   const { slug, id } = await params;
   const recId = Number(id);
   if (!Number.isInteger(recId)) return NextResponse.json({ error: 'bad id' }, { status: 400 });
