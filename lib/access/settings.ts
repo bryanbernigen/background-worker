@@ -2,15 +2,21 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { appSettings } from '@/lib/db/schema';
 
+// Values are wrapped as `{ v: <value> }` before storage. Drizzle's jsonb treats
+// a raw string input as pre-serialized JSON (so '628…' would become a JSON
+// *number* and lose leading zeros); wrapping in an object forces correct
+// JSON serialization and round-trips every scalar type faithfully.
 async function getSetting(key: string): Promise<unknown> {
   const [row] = await db.select().from(appSettings).where(eq(appSettings.key, key)).limit(1);
-  return row?.value;
+  if (!row) return undefined;
+  return (row.value as { v?: unknown } | null)?.v;
 }
 
 async function setSetting(key: string, value: unknown): Promise<void> {
+  const wrapped = { v: value };
   await db.insert(appSettings)
-    .values({ key, value, updatedAt: new Date() })
-    .onConflictDoUpdate({ target: appSettings.key, set: { value, updatedAt: new Date() } });
+    .values({ key, value: wrapped, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: appSettings.key, set: { value: wrapped, updatedAt: new Date() } });
 }
 
 /** Guest mode defaults to ON when the setting has never been written. */
@@ -30,5 +36,10 @@ export async function getAdminContactPhone(): Promise<string | null> {
   return typeof v === 'string' && v.length > 0 ? v : null;
 }
 export async function setAdminContactPhone(phone: string | null): Promise<void> {
+  // `value` is NOT NULL — clearing means removing the row (read defaults to null).
+  if (phone === null) {
+    await db.delete(appSettings).where(eq(appSettings.key, 'admin_contact_phone'));
+    return;
+  }
   await setSetting('admin_contact_phone', phone);
 }

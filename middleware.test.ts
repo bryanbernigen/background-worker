@@ -9,21 +9,30 @@ function req(method: string, path: string, token?: string) {
   return r;
 }
 
-describe('middleware auth gate', () => {
-  it('returns 401 (not a redirect) for unauthenticated API requests', async () => {
+describe('middleware access gate', () => {
+  it('403s an unauthenticated mutating API request (no redirect)', async () => {
     const res = await middleware(req('PATCH', '/api/jobs/data-annotation/settings'));
-    // Must NOT be a 3xx redirect to "/", which would turn a PATCH into a 405.
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(403);
     expect(res.headers.get('location')).toBeNull();
   });
 
-  it('redirects unauthenticated page navigations to /', async () => {
+  it('lets unauthenticated page navigations through (RSC resolves role/redirect)', async () => {
     const res = await middleware(req('GET', '/dashboard'));
-    expect(res.status).toBe(307);
-    expect(res.headers.get('location')).toBe('https://app.example.com/');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('location')).toBeNull();
   });
 
-  it('lets authenticated API requests through', async () => {
+  it('lets unauthenticated GET API requests through (handler enforces viewer + masking)', async () => {
+    const res = await middleware(req('GET', '/api/jobs/data-annotation/recipients'));
+    expect(res.status).toBe(200);
+  });
+
+  it('lets the public contact endpoint through unauthenticated', async () => {
+    const res = await middleware(req('POST', '/api/contact'));
+    expect(res.status).toBe(200);
+  });
+
+  it('lets authenticated admin mutating API requests through', async () => {
     const token = await createSessionToken('admin');
     const res = await middleware(req('PATCH', '/api/jobs/data-annotation/settings', token));
     expect(res.status).toBe(200);
