@@ -29,6 +29,13 @@
       "when": 1782825600000,
       "tag": "0003_schedule_types",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782912000000,
+      "tag": "0004_access_control",
+      "breakpoints": true
     }
   ]
 }

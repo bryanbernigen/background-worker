@@ -19,6 +19,7 @@ export const jobs = pgTable('jobs', {
   scheduleType:   text('schedule_type').notNull().default('window'),
   intervalS:      integer('interval_s'),
   cronExpr:       text('cron_expr'),
+  visibleToGuest: boolean('visible_to_guest').notNull().default(true),
   customSettings: jsonb('custom_settings').notNull().default({}),
   nextRunAt:      timestamp('next_run_at', { withTimezone: true }),
   lastRunAt:      timestamp('last_run_at', { withTimezone: true }),
@@ -60,7 +61,14 @@ export const runHistory = pgTable(
   t => ({ jobStartedIdx: index('run_history_job_started_idx').on(t.jobId, t.startedAt) }),
 );
 
+export const appSettings = pgTable('app_settings', {
+  key:       text('key').primaryKey(),
+  value:     jsonb('value').notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type Job = typeof jobs.$inferSelect;
 export type NewJob = typeof jobs.$inferInsert;
 export type Recipient = typeof recipients.$inferSelect;
 export type RunHistory = typeof runHistory.$inferSelect;
+export type AppSetting = typeof appSettings.$inferSelect;
