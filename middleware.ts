@@ -2,12 +2,13 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifySessionToken } from '@/lib/auth';
+import { requiresAdminToken } from '@/lib/access/paths';
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // 1. Pass-through for public paths
-  if (pathname === '/' || pathname === '/api/auth/login' || pathname === '/api/auth/logout') {
+  if (pathname === '/' || pathname === '/api/auth/login' || pathname === '/api/auth/logout' || pathname === '/api/contact') {
     return NextResponse.next();
   }
 
@@ -58,17 +59,15 @@ export async function middleware(req: NextRequest) {
     return new NextResponse('Unauthorized: Invalid Cron Secret or Missing Dashboard Session', { status: 401 });
   }
 
-  // 3. Secure all other paths (Dashboards, etc.)
+  // 3. Writes require an admin token at the edge (DB-free). GET/pages pass
+  //    through; the Node layer resolves admin/guest and applies masking,
+  //    per-job visibility, and page-level redirects.
   const token = req.cookies.get('session')?.value;
   const session = token ? await verifySessionToken(token) : null;
+  const isAdmin = session?.role === 'admin';
 
-  if (!session) {
-    // API requests get a clean 401 — redirecting a PATCH/POST to "/" (a GET-only
-    // page) would surface as a confusing 405. Page navigations still redirect.
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL('/', req.url));
+  if (requiresAdminToken(pathname, req.method) && !isAdmin) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
   return NextResponse.next();
