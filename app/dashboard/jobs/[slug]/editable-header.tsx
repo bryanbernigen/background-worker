@@ -35,16 +35,16 @@ export default function EditableHeader({ slug, initial }: { slug: string; initia
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold">{meta.title}</h1>
           <a href={meta.url} target="_blank" rel="noreferrer"
-            className="block text-xs text-blue-600 hover:underline font-mono break-all mt-0.5">
+            className="block text-xs text-accent hover:underline font-mono break-all mt-0.5">
             {meta.url}
           </a>
           {meta.description && (
-            <p className="text-sm text-gray-500 mt-1">{meta.description}</p>
+            <p className="text-sm text-muted mt-1">{meta.description}</p>
           )}
         </div>
         <button
           onClick={startEdit}
-          className="shrink-0 text-xs px-2 py-1 rounded border text-gray-600 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+          className="shrink-0 text-xs px-2 py-1 rounded border border-border text-muted hover:bg-surface-2 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
           aria-label="Edit job metadata"
         >Edit</button>
       </div>
@@ -52,12 +52,12 @@ export default function EditableHeader({ slug, initial }: { slug: string; initia
   }
 
   return (
-    <div className="space-y-2 border rounded-lg bg-white p-3 shadow-sm">
+    <div className="space-y-2 border border-border rounded-lg bg-surface p-3">
       <div>
         <label className="block">
-          <span className="text-xs text-gray-500">Title</span>
+          <span className="text-xs text-muted">Title</span>
           <input
-            className="w-full border rounded px-2 py-1.5 text-lg font-bold"
+            className="w-full bg-surface-2 border border-border rounded px-2 py-1.5 text-lg font-bold"
             value={draft.title}
             onChange={e => setDraft({ ...draft, title: e.target.value })}
           />
@@ -65,9 +65,9 @@ export default function EditableHeader({ slug, initial }: { slug: string; initia
       </div>
       <div>
         <label className="block">
-          <span className="text-xs text-gray-500">URL</span>
+          <span className="text-xs text-muted">URL</span>
           <input
-            className="w-full border rounded px-2 py-1 text-sm font-mono"
+            className="w-full bg-surface-2 border border-border rounded px-2 py-1 text-sm font-mono"
             value={draft.url}
             onChange={e => setDraft({ ...draft, url: e.target.value })}
           />
@@ -75,9 +75,9 @@ export default function EditableHeader({ slug, initial }: { slug: string; initia
       </div>
       <div>
         <label className="block">
-          <span className="text-xs text-gray-500">Description</span>
+          <span className="text-xs text-muted">Description</span>
           <textarea
-            className="w-full border rounded px-2 py-1 text-sm"
+            className="w-full bg-surface-2 border border-border rounded px-2 py-1 text-sm"
             rows={2}
             value={draft.description}
             onChange={e => setDraft({ ...draft, description: e.target.value })}
@@ -86,14 +86,14 @@ export default function EditableHeader({ slug, initial }: { slug: string; initia
       </div>
       <div className="flex items-center gap-2">
         <button onClick={save} disabled={busy}
-          className="text-sm px-3 py-1 rounded bg-blue-600 text-white disabled:opacity-50">
+          className="text-sm px-3 py-1 rounded bg-accent text-bg disabled:opacity-50">
           {busy ? 'Saving…' : 'Save'}
         </button>
         <button onClick={cancel} disabled={busy}
-          className="text-sm px-3 py-1 rounded border hover:bg-gray-50">
+          className="text-sm px-3 py-1 rounded border border-border hover:bg-surface-2">
           Cancel
         </button>
-        {err && <span className="text-sm text-red-600">{err}</span>}
+        {err && <span className="text-sm text-error">{err}</span>}
       </div>
     </div>
   );
