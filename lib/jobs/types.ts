@@ -43,6 +43,6 @@ export interface JobModule {
   type: string;
   defaultMeta: { title: string; url: string; description: string };
   customSettingsSchema?: ZodSchema;
-  CustomSettingsPanel?: ComponentType<{ jobId: number; current: unknown }>;
+  CustomSettingsPanel?: ComponentType<{ jobId: number; slug: string; current: unknown }>;
   run(ctx: RunContext): Promise<RunResult>;
 }
