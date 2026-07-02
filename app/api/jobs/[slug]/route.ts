@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ slu
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
-  if (role === 'guest' && !job.visibleToGuest) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+  if (role === 'guest' && (!job.visibleToGuest || job.archivedAt)) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
   // Convention: any field ending in `_encrypted` produces a `_preview` sibling
   // (masked first/last chars) on the wire. The raw ciphertext OR plaintext
