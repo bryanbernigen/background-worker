@@ -1,4 +1,4 @@
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs, recipients, runHistory, type Job } from '@/lib/db/schema';
 import { getJob } from '@/lib/jobs/registry';
@@ -54,11 +54,11 @@ export interface ManualRunOutcome {
 export async function start(): Promise<void> {
   if (isStarted()) return;
   setStarted(true);
-  const enabled = await db.select().from(jobs).where(eq(jobs.enabled, true));
+  const enabled = await db.select().from(jobs).where(and(eq(jobs.enabled, true), isNull(jobs.archivedAt)));
   for (const job of enabled) await armTimer(job.id);
-  // Expiry warnings are armed for ALL jobs, regardless of enabled — you still
-  // want to be told the cookie is about to die even if scraping is paused.
-  const all = await db.select({ id: jobs.id }).from(jobs);
+  // Expiry warnings are armed for all non-archived jobs, regardless of enabled —
+  // you still want to be told the cookie is about to die even if scraping is paused.
+  const all = await db.select({ id: jobs.id }).from(jobs).where(isNull(jobs.archivedAt));
   for (const job of all) await armExpiryTimer(job.id);
   process.on('unhandledRejection', err => {
     console.error('[scheduler] unhandledRejection', err);
@@ -114,9 +114,9 @@ async function armTimer(jobId: number): Promise<void> {
   if (prev) clearTimeout(prev);
   timers.delete(jobId);
 
-  // Disabled: ensure no timer AND clear nextRunAt so the UI shows "paused"
-  // rather than counting down toward a run that will never fire.
-  if (!job.enabled) {
+  // Disabled or archived: ensure no timer AND clear nextRunAt so the UI shows
+  // "paused" rather than counting down toward a run that will never fire.
+  if (!job.enabled || job.archivedAt) {
     if (job.nextRunAt) {
       await db.update(jobs).set({ nextRunAt: null, updatedAt: new Date() }).where(eq(jobs.id, jobId));
     }
@@ -146,7 +146,7 @@ export async function armExpiryTimer(jobId: number): Promise<void> {
   if (prev) { clearTimeout(prev); expiryTimers.delete(jobId); }
 
   const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
-  if (!job) return;
+  if (!job || job.archivedAt) return;
   const custom = (job.customSettings ?? {}) as Record<string, unknown>;
   const expiresAt = typeof custom.cookie_expires_at === 'number' ? custom.cookie_expires_at : null;
   if (!expiresAt || custom.cookie_warned === true) return;
