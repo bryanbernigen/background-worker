@@ -143,7 +143,7 @@ export default function HistoryTable({ slug }: { slug: string }) {
                       )}
                     </Td>
                     <Td><TriggerBadge t={r.triggerType} /></Td>
-                    <Td className="text-sm text-muted">{r.summary}</Td>
+                    <Td className="text-sm text-muted whitespace-pre-line">{r.summary}</Td>
                     <Td className="text-right text-muted font-mono text-xs">
                       {r.diffMs != null ? formatDurationMs(r.diffMs) : '—'}
                     </Td>

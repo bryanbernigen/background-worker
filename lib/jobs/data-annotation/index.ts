@@ -92,13 +92,17 @@ export const dataAnnotation: JobModule = {
       notificationSent = await ctx.notify(formatNotification(newItems), { tag: 'new-task' });
     }
 
-    const summary = newItems.length > 0
-      ? `+${data.newAllProjects} projects, +${data.newAllQualifications} quals`
-      : 'no change';
-
-    return { status: 'ok', summary, data, notificationSent };
+    return { status: 'ok', summary: formatDaSummary(data), data, notificationSent };
   },
 };
+
+/** Run summary: `paid/total (+newPaid/+newAll)` per bucket, projects then qualifications. */
+export function formatDaSummary(d: DaData): string {
+  return (
+    `projects: ${d.paidProjects}/${d.allProjects} (+${d.newPaidProjects}/+${d.newAllProjects})\n` +
+    `qualifications: ${d.paidQualifications}/${d.allQualifications} (+${d.newPaidQualifications}/+${d.newAllQualifications})`
+  );
+}
 
 function isPaidStr(pay: string): boolean { return pay?.includes('$') ?? false; }
 
