@@ -4,7 +4,7 @@ export async function fetchDataAnnotationPage(cookie: string): Promise<string> {
     try {
       const { readFileSync, existsSync } = await import('node:fs');
       const { join } = await import('node:path');
-      const examplePath = join(process.cwd(), 'example_response.html');
+      const examplePath = join(process.cwd(), 'lib/jobs/data-annotation/fixtures/example_response.html');
       if (existsSync(examplePath)) {
         return readFileSync(examplePath, 'utf8');
       }
