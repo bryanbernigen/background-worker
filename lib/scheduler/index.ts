@@ -94,9 +94,12 @@ export function unschedule(jobId: number): void {
 /** Manual run (HTTP-triggered). Returns lock_busy if a scheduled run is in flight. */
 export async function runManual(jobId: number): Promise<ManualRunOutcome> {
   const r = await executeRun(jobId, 'manual');
-  // A run may have refreshed the cookie expiry — re-arm the warning timer.
-  await armExpiryTimer(jobId);
   if (r.kind === 'lock_busy') return { status: 'lock_busy' };
+  // Recompute the next scheduled run + re-arm timers (run timer AND cookie-expiry).
+  // Without this, nextRunAt stays in the past and the countdown shows a false
+  // "Running for …" indefinitely; it also arms the timer for jobs that weren't
+  // armed at boot (e.g. created/restored while the server was already running).
+  await reschedule(jobId);
   return { status: 'ran', result: r.kind === 'ran' ? r.result : undefined };
 }
 
