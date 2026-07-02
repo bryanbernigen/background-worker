@@ -3,10 +3,10 @@ import { db } from '@/lib/db/client';
 import { jobs, recipients, runHistory, type Job } from '@/lib/db/schema';
 import { getJob } from '@/lib/jobs/registry';
 import type { RunResult } from '@/lib/jobs/types';
-import { buildNotifier, wahaChannelFromEnv } from '@/lib/notify';
+import { buildNotifier } from '@/lib/notify';
+import { getWahaChannel } from '@/lib/waha-config';
 import { computeNextRunAt, isWithinWindow, type ScheduleCfg } from './window';
 import { withJobLock } from './lock';
-import { WahaClient } from '@/lib/waha';
 
 // HMR-safe: stash scheduler state on globalThis so dev-mode module reloads
 // don't double-arm timers. Without this, Next.js HMR re-evaluates this module,
@@ -178,13 +178,12 @@ async function fireExpiryWarning(jobId: number): Promise<void> {
 
     const recps = await db.select().from(recipients)
       .where(and(eq(recipients.jobId, jobId), eq(recipients.tag, 'cookie-expiry')));
-    const wahaUrl = process.env.WAHA_URL;
-    if (wahaUrl && recps.length) {
-      const waha = new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '');
+    const channel = await getWahaChannel();
+    if (channel && recps.length) {
       const msg = formatExpiryWarning(job, expiresAt);
       let anySent = false;
       for (const r of recps) {
-        try { anySent = (await waha.sendText(r.phone, msg)) || anySent; }
+        try { anySent = (await channel.sendText(r.phone, msg)) || anySent; }
         catch (e) { console.error(`[scheduler] cookie-expiry send failed for ${r.phone}`, e); }
       }
       // If every send failed, leave cookie_warned unset so a later arm retries.
@@ -279,7 +278,7 @@ async function executeRun(jobId: number, trigger: Trigger): Promise<ExecOutcome>
     const recps = await db.select().from(recipients).where(eq(recipients.jobId, jobId));
     const notify = buildNotifier(
       recps.map(r => ({ id: r.id, name: r.name, phone: r.phone, tag: r.tag })),
-      wahaChannelFromEnv(),
+      await getWahaChannel(),
     );
     const lastSuccessful = await loadLastSuccessful(jobId);
     const startedAt = new Date();
@@ -369,9 +368,8 @@ async function maybeAlertFailureStreak(jobId: number, latestError: string): Prom
 
   const recps = await db.select().from(recipients).where(eq(recipients.jobId, jobId));
   if (!recps.length) return;
-  const wahaUrl = process.env.WAHA_URL;
-  if (!wahaUrl) return;
-  const waha = new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '');
+  const channel = await getWahaChannel();
+  if (!channel) return;
   const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId)).limit(1);
   const msg =
     `⚠️ *Scraper Alert* ⚠️\n\n` +
@@ -379,7 +377,7 @@ async function maybeAlertFailureStreak(jobId: number, latestError: string): Prom
     `*Latest error:* ${latestError}\n\n` +
     `_Please check the job settings (cookie, URL)._`;
   for (const r of recps) {
-    try { await waha.sendText(r.phone, msg); }
+    try { await channel.sendText(r.phone, msg); }
     catch (e) { console.error(`[scheduler] failure-alert send failed for ${r.phone}`, e); }
   }
 }

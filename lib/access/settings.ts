@@ -19,6 +19,18 @@ async function setSetting(key: string, value: unknown): Promise<void> {
     .onConflictDoUpdate({ target: appSettings.key, set: { value: wrapped, updatedAt: new Date() } });
 }
 
+export async function getStringSetting(key: string): Promise<string | null> {
+  const v = await getSetting(key);
+  return typeof v === 'string' && v.length > 0 ? v : null;
+}
+export async function setStringSetting(key: string, value: string | null): Promise<void> {
+  if (value === null || value === '') {
+    await db.delete(appSettings).where(eq(appSettings.key, key));
+    return;
+  }
+  await setSetting(key, value);
+}
+
 /** Guest mode defaults to ON when the setting has never been written. */
 export function guestModeFromValue(v: unknown): boolean {
   if (v === undefined || v === null) return true;

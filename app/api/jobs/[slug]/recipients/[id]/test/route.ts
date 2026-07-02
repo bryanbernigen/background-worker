@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { jobs, recipients } from '@/lib/db/schema';
 import { requireAdmin } from '@/lib/access/role';
-import { WahaClient } from '@/lib/waha';
+import { getWahaChannel } from '@/lib/waha-config';
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ slug: string; id: string }> }) {
   const guard = await requireAdmin(); if (!guard.ok) return guard.res;
@@ -18,11 +18,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ sl
     .where(and(eq(recipients.id, recId), eq(recipients.jobId, job.id))).limit(1);
   if (!row) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const wahaUrl = process.env.WAHA_URL;
-  if (!wahaUrl) return NextResponse.json({ error: 'WAHA_URL not configured' }, { status: 500 });
-  const waha = new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '');
+  const channel = await getWahaChannel();
+  if (!channel) return NextResponse.json({ error: 'WhatsApp not configured' }, { status: 500 });
   try {
-    const ok = await waha.sendText(row.phone, `✅ Test message from ${job.title} (auto-checker)`);
+    const ok = await channel.sendText(row.phone, `✅ Test message from ${job.title} (background-worker)`);
     if (!ok) return NextResponse.json({ error: 'WAHA returned non-OK' }, { status: 502 });
     return NextResponse.json({ ok: true });
   } catch (e) {
