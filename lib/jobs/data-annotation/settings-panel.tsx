@@ -69,16 +69,16 @@ export default function DASettingsPanel({ current }: Props) {
   const { preview, expiresAt, checkedAt, invalid } = state;
 
   return (
-    <div className="space-y-3 border rounded p-4 bg-white">
+    <div className="space-y-3 border border-border rounded p-4 bg-surface">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">DataAnnotation cookie</h3>
-        {preview && <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">stored</span>}
+        {preview && <span className="text-xs px-2 py-0.5 rounded bg-ok/20 text-ok">stored</span>}
       </div>
 
       {preview ? (
         <StoredCookieView preview={preview} />
       ) : (
-        <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+        <div className="text-sm text-warn bg-warn/10 border border-warn/30 rounded p-2">
           No cookie configured yet. Paste your session cookie below to enable scraping.
         </div>
       )}
@@ -86,9 +86,9 @@ export default function DASettingsPanel({ current }: Props) {
       {preview && <CookieExpiry expiresAt={expiresAt} checkedAt={checkedAt} invalid={invalid} />}
 
       <label className="block">
-        <span className="text-sm text-gray-600">{preview ? 'Replace with new cookie' : 'Paste session cookie'}</span>
+        <span className="text-sm text-muted">{preview ? 'Replace with new cookie' : 'Paste session cookie'}</span>
         <textarea
-          className="w-full border rounded p-2 text-sm font-mono mt-1"
+          className="w-full bg-surface-2 border border-border rounded p-2 text-sm font-mono mt-1"
           rows={3}
           placeholder="session=...; other=..."
           value={value}
@@ -99,9 +99,9 @@ export default function DASettingsPanel({ current }: Props) {
         <button
           disabled={busy || !value}
           onClick={save}
-          className="px-3 py-1.5 rounded bg-blue-600 text-white disabled:opacity-50"
+          className="px-3 py-1.5 rounded bg-accent text-bg font-medium disabled:opacity-50"
         >{preview ? 'Update cookie' : 'Save cookie'}</button>
-        {msg && <span className="text-sm text-gray-600">{msg}</span>}
+        {msg && <span className="text-sm text-muted">{msg}</span>}
       </div>
     </div>
   );
@@ -123,7 +123,7 @@ function CookieExpiry({ expiresAt, checkedAt, invalid }: { expiresAt?: number; c
 
   if (invalid) {
     return (
-      <div className="text-sm rounded p-2 bg-red-50 border border-red-200 text-red-800">
+      <div className="text-sm rounded p-2 bg-error/10 border border-error/30 text-error">
         ⛔ Cookie was rejected by DataAnnotation — paste a fresh one.
       </div>
     );
@@ -131,7 +131,7 @@ function CookieExpiry({ expiresAt, checkedAt, invalid }: { expiresAt?: number; c
 
   if (!expiresAt) {
     return (
-      <div className="text-sm rounded p-2 bg-gray-50 border text-gray-500">
+      <div className="text-sm rounded p-2 bg-surface-2 border border-border text-muted">
         No expiry detected yet — will populate on the next check.
       </div>
     );
@@ -142,10 +142,10 @@ function CookieExpiry({ expiresAt, checkedAt, invalid }: { expiresAt?: number; c
   const under24h = remainingS !== null && remainingS > 0 && remainingS <= 24 * 3600;
 
   const tone = expired
-    ? 'bg-red-50 border-red-200 text-red-800'
+    ? 'bg-error/10 border-error/30 text-error'
     : under24h
-      ? 'bg-amber-50 border-amber-200 text-amber-800'
-      : 'bg-emerald-50 border-emerald-200 text-emerald-800';
+      ? 'bg-warn/10 border-warn/30 text-warn'
+      : 'bg-ok/10 border-ok/30 text-ok';
 
   return (
     <div className={`text-sm rounded p-2 border ${tone}`}>
@@ -198,18 +198,18 @@ function StoredCookieView({ preview }: { preview: string }) {
   const m = preview.match(/^(.+?)…(.+?) \((\d+) chars\)$/);
   if (!m) {
     // Fallback if format changes.
-    return <div className="font-mono text-sm bg-gray-50 border rounded p-2 break-all">{preview}</div>;
+    return <div className="font-mono text-sm bg-surface-2 border border-border rounded p-2 break-all">{preview}</div>;
   }
   const [, front, back, lenStr] = m;
   const totalLen = parseInt(lenStr, 10);
   const maskLen = Math.max(8, totalLen - front.length - back.length);
   const mask = '•'.repeat(Math.min(32, maskLen)); // cap visual mask length
   return (
-    <div className="font-mono text-sm bg-gray-50 border rounded p-2 break-all">
-      <span className="text-gray-800">{front}</span>
-      <span className="text-gray-400" title={`${maskLen} hidden chars`}>{mask}</span>
-      <span className="text-gray-800">{back}</span>
-      <span className="text-xs text-gray-500 ml-2">({totalLen} chars total)</span>
+    <div className="font-mono text-sm bg-surface-2 border border-border rounded p-2 break-all">
+      <span className="text-text">{front}</span>
+      <span className="text-muted" title={`${maskLen} hidden chars`}>{mask}</span>
+      <span className="text-text">{back}</span>
+      <span className="text-xs text-muted ml-2">({totalLen} chars total)</span>
     </div>
   );
 }
