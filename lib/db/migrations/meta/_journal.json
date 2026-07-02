@@ -36,6 +36,13 @@
       "when": 1782912000000,
       "tag": "0004_access_control",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782998400000,
+      "tag": "0005_backfill_da_summary",
+      "breakpoints": true
     }
   ]
 }
