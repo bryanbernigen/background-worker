@@ -44,6 +44,6 @@ next-env.d.ts
 # git worktrees
 /.worktrees
 
-# local sample data
-example_response.html
+# local dev fixture — scraped page contains third-party API keys, keep out of git
+lib/jobs/data-annotation/fixtures/example_response.html
 .superpowers/

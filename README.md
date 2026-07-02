@@ -1,4 +1,4 @@
-# Auto Checker
+# Background Worker
 
 Monitors the DataAnnotation projects API on a randomized interval (within a configurable daily window) and sends WhatsApp alerts via WAHA when new paid projects or qualifications with available tasks appear. Jobs, recipients, schedules, and the stored login cookie are all managed from the dashboard UI and persisted in PostgreSQL.
 
