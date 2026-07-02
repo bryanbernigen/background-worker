@@ -12,6 +12,7 @@ import RecipientsPanel from './recipients-panel';
 import HistoryTable from './history-table';
 import Countdown from './countdown';
 import RunNowButton from './run-now-button';
+import LifecycleControls from './lifecycle-controls';
 
 export default async function JobPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -21,7 +22,8 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return notFound();
-  if (!isAdmin && !job.visibleToGuest) return notFound();
+  if (!isAdmin && (!job.visibleToGuest || job.archivedAt)) return notFound();
+  const archived = !!job.archivedAt;
   const mod = getJob(job.type);
 
   const custom = (job.customSettings ?? {}) as Record<string, unknown>;
@@ -57,6 +59,13 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
         </div>
       )}
 
+      {isAdmin && (
+        <div className="flex items-center gap-3">
+          {archived && <span className="text-[11px] font-mono uppercase tracking-wider text-warn">archived</span>}
+          <LifecycleControls slug={slug} archived={archived} />
+        </div>
+      )}
+
         <div className="flex items-center gap-4">
           <Countdown slug={slug} initial={{
             nextRunAt: job.nextRunAt?.toISOString() ?? null,
@@ -65,7 +74,7 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
             maxIntervalS: job.maxIntervalS,
             enabled: job.enabled,
           }} />
-          {isAdmin && (
+          {isAdmin && !archived && (
             <div className="shrink-0 flex items-start gap-2">
               <RunNowButton slug={slug} />
               <EnableToggle slug={slug} initialEnabled={job.enabled} />
@@ -73,16 +82,16 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
           )}
         </div>
 
-      {isAdmin && (
+      {isAdmin && !archived && (
         <ScheduleForm slug={slug} initial={{
           scheduleType: job.scheduleType, minIntervalS: job.minIntervalS, maxIntervalS: job.maxIntervalS,
           dayStartHour: job.dayStartHour, dayEndHour: job.dayEndHour, tzOffsetH: job.tzOffsetH,
           intervalS: job.intervalS, cronExpr: job.cronExpr,
         }} />
       )}
-      {isAdmin && Panel && <Panel jobId={job.id} slug={slug} current={customForPanel} />}
-      <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" admin={isAdmin} />
-      <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" admin={isAdmin} />
+      {isAdmin && !archived && Panel && <Panel jobId={job.id} slug={slug} current={customForPanel} />}
+      <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" admin={isAdmin && !archived} />
+      <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" admin={isAdmin && !archived} />
       <HistoryTable slug={slug} />
     </div>
   );
