@@ -9,8 +9,8 @@ Monitors the DataAnnotation projects API on a randomized interval (within a conf
 docker compose -f waha/docker-compose.yml up -d
 
 # 2. Start Postgres (any local instance works; example with Docker)
-docker run -d --name auto-checker-db -p 5432:5432 \
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=auto_checker postgres:16
+docker run -d --name background-worker-db -p 5432:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=background_worker postgres:16
 
 # 3. Install deps and configure env
 npm install
