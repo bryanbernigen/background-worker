@@ -43,6 +43,13 @@
       "when": 1782998400000,
       "tag": "0005_backfill_da_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783084800000,
+      "tag": "0006_archive_jobs",
+      "breakpoints": true
     }
   ]
 }
