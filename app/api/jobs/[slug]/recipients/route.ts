@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const { slug } = await params;
   const job = await getJobOr404(slug);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
-  if (role === 'guest' && !job.visibleToGuest) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+  if (role === 'guest' && (!job.visibleToGuest || job.archivedAt)) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
   // Optional ?tag=new-task|cookie-expiry filter; omitted → all recipients.
   const tagParam = new URL(req.url).searchParams.get('tag');

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
 
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
-  if (role === 'guest' && !job.visibleToGuest) return NextResponse.json({ error: 'job not found' }, { status: 404 });
+  if (role === 'guest' && (!job.visibleToGuest || job.archivedAt)) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
   const url = new URL(req.url);
   const page     = Math.max(1,  parseInt(url.searchParams.get('page')     ?? '1',  10));
