@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/access/role';
 import { getAdminContactPhone } from '@/lib/access/settings';
-import { wahaChannelFromEnv } from '@/lib/notify';
+import { getWahaChannel } from '@/lib/waha-config';
 
 export async function POST() {
   const guard = await requireAdmin(); if (!guard.ok) return guard.res;
   const phone = await getAdminContactPhone();
-  const channel = wahaChannelFromEnv();
+  const channel = await getWahaChannel();
   if (!phone || !channel) return NextResponse.json({ error: 'Set an admin contact phone and configure WAHA first.' }, { status: 400 });
   let sent = false;
   try { sent = await channel.sendText(phone, '✅ Test message from Background Worker'); }

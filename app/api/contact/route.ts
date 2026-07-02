@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateContact, checkRateLimit, formatContactMessage, ContactError } from '@/lib/contact';
 import { getAdminContactPhone } from '@/lib/access/settings';
-import { wahaChannelFromEnv } from '@/lib/notify';
+import { getWahaChannel } from '@/lib/waha-config';
 
 export async function POST(req: NextRequest) {
   const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown';
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   if (parsed.kind === 'honeypot') return NextResponse.json({ ok: true }); // silently drop bots
 
   const phone = await getAdminContactPhone();
-  const channel = wahaChannelFromEnv();
+  const channel = await getWahaChannel();
   if (!phone || !channel) return NextResponse.json({ error: 'Contact is unavailable right now.' }, { status: 503 });
 
   let sent = false;

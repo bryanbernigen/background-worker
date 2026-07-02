@@ -4,6 +4,7 @@ import { db } from '@/lib/db/client';
 import { jobs, runHistory } from '@/lib/db/schema';
 import { resolveRole } from '@/lib/access/role';
 import { getAdminContactPhone } from '@/lib/access/settings';
+import { getWahaConfig } from '@/lib/waha-config';
 import Rail from './rail';
 
 async function latestStatus(jobId: number): Promise<string> {
@@ -25,7 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     slug: j.slug, title: j.title, type: j.type, scheduleType: j.scheduleType,
     visibleToGuest: j.visibleToGuest, status: await latestStatus(j.id),
   })));
-  const contactEnabled = !isAdmin && !!(await getAdminContactPhone()) && !!process.env.WAHA_URL;
+  const contactEnabled = !isAdmin && !!(await getAdminContactPhone()) && !!(await getWahaConfig()).url;
 
   return (
     <div className="min-h-screen flex bg-bg text-text">

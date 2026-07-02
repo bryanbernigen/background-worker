@@ -5,6 +5,7 @@ import { jobs, runHistory } from '@/lib/db/schema';
 import { isWithinWindow } from '@/lib/scheduler/window';
 import { schedulerStatus } from '@/lib/scheduler';
 import { WahaClient } from '@/lib/waha';
+import { getWahaConfig } from '@/lib/waha-config';
 import { computeHealth, healthHttpStatus, type HealthReport, type JobHealthInput } from '@/lib/health';
 
 // Always evaluated fresh — never cached.
@@ -19,12 +20,11 @@ async function evaluate(): Promise<{ report: HealthReport & { time: string }; co
   try { await db.execute(sql`select 1`); } catch { dbOk = false; }
 
   // 2. WAHA — only `WORKING` means it can actually send.
-  const wahaUrl = process.env.WAHA_URL;
+  const { url: wahaUrl, apiKey: wahaKey, session: wahaSession } = await getWahaConfig();
   const waha = { configured: !!wahaUrl, reachable: false, status: null as string | null, account: null as string | null };
   if (wahaUrl) {
     try {
-      const s = await new WahaClient(wahaUrl, process.env.WAHA_API_KEY ?? '')
-        .getSessionStatus(process.env.WAHA_SESSION ?? 'default');
+      const s = await new WahaClient(wahaUrl, wahaKey).getSessionStatus(wahaSession);
       waha.reachable = true;
       waha.status = s.status;
       waha.account = s.me?.pushName ?? s.me?.id ?? null;
