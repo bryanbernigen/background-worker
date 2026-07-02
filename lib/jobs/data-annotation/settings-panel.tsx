@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { formatDurationS } from '@/lib/format-duration';
 
-interface Props { jobId: number; current: unknown }
+interface Props { jobId: number; slug: string; current: unknown }
 
 interface CookieState {
   preview?: string;
@@ -21,7 +21,7 @@ function readState(current: unknown): CookieState {
   };
 }
 
-export default function DASettingsPanel({ current }: Props) {
+export default function DASettingsPanel({ slug, current }: Props) {
   const [state, setState] = useState<CookieState>(() => readState(current));
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -30,7 +30,7 @@ export default function DASettingsPanel({ current }: Props) {
   // Pull the latest cookie state from the server.
   const refresh = async () => {
     try {
-      const res = await fetch(`/api/jobs/data-annotation`, { cache: 'no-store' });
+      const res = await fetch(`/api/jobs/${slug}`, { cache: 'no-store' });
       if (!res.ok) return;
       const body = await res.json();
       setState(readState(body?.job?.custom));
@@ -48,7 +48,7 @@ export default function DASettingsPanel({ current }: Props) {
   const save = async () => {
     if (!value) return;
     setBusy(true); setMsg('Saving & validating…');
-    const res = await fetch(`/api/jobs/data-annotation/settings`, {
+    const res = await fetch(`/api/jobs/${slug}/settings`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ custom: { cookie: value } }),

@@ -80,7 +80,7 @@ export default async function JobPage({ params }: { params: Promise<{ slug: stri
           intervalS: job.intervalS, cronExpr: job.cronExpr,
         }} />
       )}
-      {isAdmin && Panel && <Panel jobId={job.id} current={customForPanel} />}
+      {isAdmin && Panel && <Panel jobId={job.id} slug={slug} current={customForPanel} />}
       <RecipientsPanel slug={slug} tag="new-task" title="WhatsApp recipients (new-task alerts)" admin={isAdmin} />
       <RecipientsPanel slug={slug} tag="cookie-expiry" title="Cookie-expiry alert recipients" admin={isAdmin} />
       <HistoryTable slug={slug} />
