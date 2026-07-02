@@ -14,7 +14,7 @@ export interface ExternalService {
 }
 
 /** GitHub repo this app is built from — used for commit links. */
-export const GITHUB_REPO_URL = 'https://github.com/bryanbernigen/auto-checker';
+export const GITHUB_REPO_URL = 'https://github.com/bryanbernigen/background-worker';
 
 export const externalServices: ExternalService[] = [
   {

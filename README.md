@@ -59,7 +59,7 @@ The app and WAHA both deploy to Northflank as containers, backed by a managed Po
 
 ### 2. Auto Checker app
 
-1. Create a **Combined service** (build + deploy) from the GitHub repo `bryanbernigen/auto-checker`, branch `main`.
+1. Create a **Combined service** (build + deploy) from the GitHub repo `bryanbernigen/background-worker`, branch `main`.
 2. Build from the included `Dockerfile` (Next.js standalone output).
 3. Expose **port 3000** with a public domain.
 4. Set environment variables / secrets:
