@@ -22,26 +22,26 @@ export default function ContactAdmin() {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="text-sm px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700">
+      <button onClick={() => setOpen(true)} className="text-sm px-3 py-1.5 rounded bg-accent text-bg font-medium hover:opacity-90">
         Request full access
       </button>
     );
   }
   return (
-    <div className="border rounded-lg bg-white shadow-sm p-4 w-full max-w-md space-y-2">
+    <div className="border border-border rounded-lg bg-surface p-4 w-full max-w-md space-y-2">
       <h3 className="font-semibold">Request full access</h3>
-      <input className="border rounded px-2 py-1 text-sm w-full" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} />
-      <input className="border rounded px-2 py-1 text-sm w-full" placeholder="How to reach you (email / WhatsApp)" value={contact} onChange={e => setContact(e.target.value)} />
-      <textarea className="border rounded px-2 py-1 text-sm w-full" placeholder="Message" rows={3} value={message} onChange={e => setMessage(e.target.value)} />
+      <input className="bg-surface-2 border border-border rounded px-2 py-1 text-sm w-full" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} />
+      <input className="bg-surface-2 border border-border rounded px-2 py-1 text-sm w-full" placeholder="How to reach you (email / WhatsApp)" value={contact} onChange={e => setContact(e.target.value)} />
+      <textarea className="bg-surface-2 border border-border rounded px-2 py-1 text-sm w-full" placeholder="Message" rows={3} value={message} onChange={e => setMessage(e.target.value)} />
       <input tabIndex={-1} autoComplete="off" aria-hidden className="hidden" value={company} onChange={e => setCompany(e.target.value)} />
       <div className="flex items-center gap-2">
         <button onClick={submit} disabled={sending || !name || !contact || !message}
-          className="text-sm px-3 py-1.5 rounded bg-green-600 text-white disabled:bg-gray-300">
+          className="text-sm px-3 py-1.5 rounded bg-accent text-bg font-medium disabled:opacity-50">
           {sending ? 'Sending…' : 'Send'}
         </button>
-        <button onClick={() => setOpen(false)} className="text-sm px-3 py-1.5 rounded border">Cancel</button>
+        <button onClick={() => setOpen(false)} className="text-sm px-3 py-1.5 rounded border border-border hover:bg-surface-2">Cancel</button>
       </div>
-      {msg && <div className="text-sm text-gray-600">{msg}</div>}
+      {msg && <div className="text-sm text-muted">{msg}</div>}
     </div>
   );
 }
