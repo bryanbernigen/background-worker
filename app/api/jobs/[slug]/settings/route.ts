@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ sl
   const [job] = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
   if (!job) return NextResponse.json({ error: 'job not found' }, { status: 404 });
 
-  const mod = getJob(slug);
+  const mod = getJob(job.type);
   if (!mod) return NextResponse.json({ error: 'no registered module' }, { status: 500 });
 
   let newCustom = job.customSettings as Record<string, unknown>;
